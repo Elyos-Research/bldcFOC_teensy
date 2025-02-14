@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"name": "bldc_v1",
+			"path": "."
+		}
+	],
+	"settings": {}
+}
