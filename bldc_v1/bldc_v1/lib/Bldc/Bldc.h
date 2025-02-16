@@ -1,27 +1,33 @@
-// #ifndef BLDC_H
-// #define BLDC_H
+#ifndef BLDC_H
+#define BLDC_H
 
-// #include <Arduino.h>
-// #include "Pinout.h"
+#include <Arduino.h>
+#include "Pinout.h"
 
-// class Bldc
-// {
-// private:
-//     uint16_t throttle_raw; // Analog values 
-//     uint8_t hall_state; // Hall state 
-//     // Time auxiliaries 
-//     uint32_t blink_aux;
-//     uint32_t throttle_aux;
-//     uint32_t print_aux;  // Debug
-//     static void identifyHalls(uint8_t &curent_hall_state);
-//     static void setPhaseDuty(uint16_t &h_a, uint16_t &l_a, uint16_t &h_b, uint16_t &l_b, uint16_t &h_c, uint16_t &l_c);
-//     static void readThrottle(uint16_t &throttle);
-//     static void setGatePWM(int gate, uint16_t pwm);
-// public:
-//     Bldc();
-//     ~Bldc();
-//     static void driverInit(void);   // Initialize the driver
-//     static void runTrapezoidAlgo(void);
-// };
+class Bldc
+{
+private:
+    uint32_t trap_duty;
+    uint8_t hall_state;
 
-// #endif //BLDC_H
+    static void getHalls(uint8_t &hall);
+    static void readThrottle(uint16_t &throttle);
+    void identifyHalls(uint8_t &current_hall_state);
+    void setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c);
+    static void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
+    void setGatePWM(int gate, uint16_t pwm);
+    void configurePWMs();
+
+public:
+    enum ControlType { Trap, Foc };
+    ControlType controlType;
+
+    Bldc();
+    ~Bldc();
+    void driverInit();
+    void run();
+    static void pwmIRQ_handler();
+
+};
+
+#endif //BLDC_H

@@ -1,13 +1,17 @@
 #include <Arduino.h>
-// #include "Bldc.h"
+#include "Bldc.h"
 
-// Bldc bldc;
+Bldc bldc;
+bool irq_flag_state;
 
-// void setup(){
-//   bldc.driverInit();
-// }
+void setup(){
+  bldc.driverInit();
+  irq_flag_state = false;
+}
 
-int main(){
-  // bldc.runTrapezoidAlgo();
-  return 0;
+void loop(){
+  bldc.run();
+  Serial.println(".+"); //< just to see if doest break
+
+  delay(100);
 }
