@@ -68,10 +68,8 @@
 
 #define PWM_FREQUENCY 20000 // 20 kHz
 #define FLEXPWM_MODULE IMXRT_FLEXPWM4 // Using FLEXPWM4
-#define SUBMODULE 0 // Using Submodule 0 (for GATE_AH)
-#define IRQ_PWM IRQ_FLEXPWM4_0 // NVIC IRQ for FlexPWM4 Submodule 0
-
-
+#define SUBMODULE 2 // Using Submodule 0 (for GATE_AH)
+#define IRQ_PWM IRQ_FLEXPWM4_2 // NVIC IRQ for FlexPWM4 Submodule 2
 
 #endif
 

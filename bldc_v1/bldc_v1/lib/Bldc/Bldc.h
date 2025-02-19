@@ -26,7 +26,7 @@ public:
     ~Bldc();
     void driverInit();
     void run();
-    static void pwmIRQ_handler();
+    static void pwmReloadISR();
 
 };
 
