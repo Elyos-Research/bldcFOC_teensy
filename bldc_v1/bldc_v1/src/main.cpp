@@ -11,7 +11,4 @@ void setup(){
 
 void loop(){
   bldc.run();
-  Serial.println(".+"); //< just to see if doest break
-
-  delay(100);
 }

@@ -59,17 +59,16 @@
 #define TIME_TO_PRINT 1000
 
 #define THROTTLE_LOW 10
-#define THROTTLE_HIGH 250
-
-
-
-
-
+#define THROTTLE_HIGH 4094
+#define THROTTLE_RESOLUTION 4095
 
 #define PWM_FREQUENCY 20000 // 20 kHz
 #define FLEXPWM_MODULE IMXRT_FLEXPWM4 // Using FLEXPWM4
 #define SUBMODULE 2 // Using Submodule 0 (for GATE_AH)
 #define IRQ_PWM IRQ_FLEXPWM4_2 // NVIC IRQ for FlexPWM4 Submodule 2
+
+// #define 
+
 
 #endif
 

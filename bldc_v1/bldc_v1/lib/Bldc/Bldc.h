@@ -17,6 +17,7 @@ private:
     static void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
     void setGatePWM(int gate, uint16_t pwm);
     void configurePWMs();
+    void configureADCs();
 
 public:
     enum ControlType { Trap, Foc };
@@ -27,6 +28,7 @@ public:
     void driverInit();
     void run();
     static void pwmReloadISR();
+    static void adcISR();
 
 };
 
