@@ -105,7 +105,8 @@ void Bldc::configureADCs(){
     analogReadAveraging(8);
 
     IMXRT_ADC1.GC |= ADC_GC_ADCO;  // Modo continuo (puedes quitar esto si no lo necesitas)
-    IMXRT_ADC1.HC0 = ADC_HC_ADCH(CURRENT_SENSE_A) | ADC_HC_AIEN;  // Seleccionar canal y habilitar interrupción
+    //  Enable interrupt for ADC1
+    IMXRT_ADC1.HC0 |= ADC_HC_AIEN;
 
     // attachInterrupt(IRQ_ADC1, adcISR);
 
@@ -196,6 +197,7 @@ void Bldc::run(){
         IMXRT_FLEXPWM4.SM[2].STS |= FLEXPWM_SMSTS_RF;
 
         // Trigger ADC's conversions
+        IMXRT_ADC1.HC0 = ADC_HC_ADCH(CURRENT_SENSE_A) |ADC_HC_ADCH(CURRENT_SENSE_B)|ADC_HC_ADCH(CURRENT_SENSE_C);
     }
 
     if (controlType == Trap) {

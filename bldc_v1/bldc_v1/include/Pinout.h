@@ -42,7 +42,7 @@
 
 // ADC Inputs
 #define THROTTLE_PIN    A13 
-#define CURRENT_SENSE_A A14 //< Cambio
+#define CURRENT_SENSE_A A14 // ADC
 #define CURRENT_SENSE_B A15 //< Cambio
 #define CURRENT_SENSE_C A16 //< Cambio
 
