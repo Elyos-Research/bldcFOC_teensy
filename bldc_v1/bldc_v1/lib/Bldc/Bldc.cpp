@@ -113,6 +113,9 @@ void Bldc::configurePWMs() {
     IMXRT_FLEXPWM3.MCTRL |= FLEXPWM_MCTRL_LDOK(2);
     IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_LDOK(6);
 
+    // Enable Hardware trigger for ADC conversions when VAL1 is reached (PWM_OUT_TRIG1)
+    IMXRT_FLEXPWM4.SM[2].TCTRL |= FLEXPWM_SMTCTRL_OUT_TRIG_EN(1); 
+
     IMXRT_FLEXPWM4.MCTRL |= FLEXPWM_MCTRL_RUN(4);
     IMXRT_FLEXPWM3.MCTRL |= FLEXPWM_MCTRL_RUN(2);
     IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_RUN(6);
@@ -120,9 +123,6 @@ void Bldc::configurePWMs() {
     IMXRT_FLEXPWM4.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 4) | FLEXPWM_OUTEN_PWMB_EN(1 << 4);
     IMXRT_FLEXPWM3.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 2) | FLEXPWM_OUTEN_PWMB_EN(1 << 2);
     IMXRT_FLEXPWM2.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 6) | FLEXPWM_OUTEN_PWMB_EN(1 << 6);
-
-    // Enable Hardware trigger for ADC conversions when VAL1 is reached (PWM_OUT_TRIG1)
-    IMXRT_FLEXPWM4.SM[2].TCTRL |= FLEXPWM_SMTCTRL_OUT_TRIG_EN(1); 
 
     attachInterruptVector(IRQ_FLEXPWM4_2, PWM4_CompletedCallback);
     NVIC_ENABLE_IRQ(IRQ_FLEXPWM4_2);
@@ -158,17 +158,31 @@ void ADC2_CompletedConversionCallback(){
     digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
 
     // Get ADC value from register
-    uint16_t val = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 4095;
-
-    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));    
-
-    ADC_ETC_DONE0_1_IRQ |= 1 << 16;  // Clear
+    uint16_t val = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 4095;  
+    // Clear ISR flag
+    ADC_ETC_DONE0_1_IRQ |= 1 << 16;  
+    asm("dsb");
 }   
+
+
+void adcetc0_isr() {
+    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    ADC_ETC_DONE0_1_IRQ |= 1;   // clear
+    uint16_t val0 = ADC_ETC_TRIG1_RESULT_1_0 & 4095;
+    asm("dsb");
+  }
+  
+  void adcetc1_isr() {
+    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    ADC_ETC_DONE0_1_IRQ |= 1 << 16;   // clear
+    uint16_t val1 = (ADC_ETC_TRIG1_RESULT_1_0 >> 16) & 4095;
+    asm("dsb");
+  }
 
 void Bldc::configureADCs(){
     // Use XBAR to connect PWM4.2 to ADC ETC 0
     CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);
-    xbar_connect(XBARA1_IN_FLEXPWM4_PWM2_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG01);
+    xbar_connect(XBARA1_IN_FLEXPWM4_PWM2_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG10);
 
     // Configure ADC2 oversample and 12 bit conversion
     IMXRT_ADC2.CFG = ADC_CFG_AVGS(0b01) | ADC_CFG_MODE(0b10) | ADC_CFG_ADTRG;
@@ -179,30 +193,40 @@ void Bldc::configureADCs(){
     // attachInterruptVector(IRQ_ADC2, ADC2_CompletedConversionCallback);
     // NVIC_ENABLE_IRQ(IRQ_ADC2);
 
-    // ADC External Trigger Controller (ETC)
     // Soft Reset the ADC_ETC module
     IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_SOFTRST;  
-    // Clear the reset
     IMXRT_ADC_ETC.CTRL &= ~ADC_ETC_CTRL_SOFTRST; 
     delay(5);
     // Enable External Signal Controller 1
+    //ADC_ETC_TRIG0_CTRL = 0x100;
     IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_TRIG_ENABLE((1 << 1));
+    //ADC_ETC_TRIG0_CHAIN_1_0 = 0x50283017;
 
+    // IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
     IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
     ADC_ETC_TRIG_CHAIN_IE0(1)  /* Enable interrupt for first conversion */
     | ADC_ETC_TRIG_CHAIN_HWTS0(1)  /* Select Hardware Trigger Source 0 */
     | ADC_ETC_TRIG_CHAIN_CSEL0(1)  /* First conversion: ADC2 channel 1 */
+    
+    | ADC_ETC_TRIG_CHAIN_IE1(1)  /* Enable interrupt for second conversion */
+    | ADC_ETC_TRIG_CHAIN_CSEL1(3)  /* Second conversion: ADC2 channel 3 */
     ;
-
+    
     // START ADC's
+    //ADC2_HC0 = 16;
     IMXRT_ADC2.HC0 = ADC_HC_ADCH(1) | ADC_HC_AIEN;
-    IMXRT_ADC2.HC1 = ADC_HC_ADCH(3) | ADC_HC_AIEN;
-    IMXRT_ADC2.HC2 = ADC_HC_ADCH(4) | ADC_HC_AIEN;
+    //IMXRT_ADC2.HC1 = ADC_HC_ADCH(3) | ADC_HC_AIEN;
+    //IMXRT_ADC2.HC2 = ADC_HC_ADCH(4) | ADC_HC_AIEN;
 
     // Link external trigger interrupt to callback
-    attachInterruptVector(IRQ_ADC_ETC0, ADC2_CompletedConversionCallback);
+    // attachInterruptVector(IRQ_ADC_ETC0, ADC2_CompletedConversionCallback);
+    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
+    // attachInterruptVector(IRQ_ADC_ETC1, ADC2_CompletedConversionCallback);
+    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+
+    attachInterruptVector(IRQ_ADC_ETC0, adcetc0_isr);
     NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-    attachInterruptVector(IRQ_ADC_ETC1, ADC2_CompletedConversionCallback);
+    attachInterruptVector(IRQ_ADC_ETC1, adcetc1_isr);
     NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
 }
 
