@@ -41,10 +41,10 @@
 #define IRQ_FLAG_PIN 4 //< Irq flag 
 
 // ADC Inputs
-#define THROTTLE_PIN    A13 
-#define CURRENT_SENSE_A A14 // ADC
-#define CURRENT_SENSE_B A15 //< Cambio
-#define CURRENT_SENSE_C A16 //< Cambio
+#define THROTTLE_PIN    A10 // ADC1_1 = A10 = AD_B0_12 
+#define CURRENT_SENSE_A A12 // ADC2_3 = A12 = AD_B1_14
+#define CURRENT_SENSE_B A13 // ADC2_4 = A13 = AD_B1_15
+#define CURRENT_SENSE_C A14 // ADC2_1 = A14 = AD_B1_12
 
 // ADC Resolution & Sampling
 #define ANALOG_RESOLUTION 12
@@ -66,9 +66,6 @@
 #define FLEXPWM_MODULE IMXRT_FLEXPWM4 // Using FLEXPWM4
 #define SUBMODULE 2 // Using Submodule 0 (for GATE_AH)
 #define IRQ_PWM IRQ_FLEXPWM4_2 // NVIC IRQ for FlexPWM4 Submodule 2
-
-// #define 
-
 
 #endif
 

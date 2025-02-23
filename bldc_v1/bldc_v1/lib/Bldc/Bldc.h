@@ -10,14 +10,20 @@ private:
     uint32_t trap_duty;
     uint8_t hall_state;
 
-    static void getHalls(uint8_t &hall);
-    static void readThrottle(uint16_t &throttle);
-    void identifyHalls(uint8_t &current_hall_state);
-    void setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c);
-    static void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
-    void setGatePWM(int gate, uint16_t pwm);
+    uint8_t current_sense_index;
+    
+    // Configuration
     void configurePWMs();
     void configureADCs();
+    // PWM Control
+    void setGatePWM(int gate, uint16_t pwm);
+    void setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c);
+    // Hall sensors
+    void getHalls(uint8_t &hall);
+    void identifyHalls(uint8_t &current_hall_state);
+    // Read sensors
+    void readThrottle(uint16_t &throttle);
+    void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
 
 public:
     enum ControlType { Trap, Foc };
@@ -25,9 +31,9 @@ public:
 
     Bldc();
     ~Bldc();
+    
     void driverInit();
     void run();
-    static void pwmReloadISR();
     static void adcISR();
 
 };
