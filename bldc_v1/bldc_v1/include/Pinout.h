@@ -30,12 +30,12 @@
 #define HALL_OVERSAMPLE ((uint8_t)8)
 
 // DRIVER GATES (PWM Outputs)
-#define GATE_AH  2   // FlexPWM4.2 (A)
-#define GATE_AL  3   // FlexPWM4.2 (B)
-#define GATE_BH  28  // FlexPWM3.1 (A)
-#define GATE_BL  29  // FlexPWM3.1 (B)
-#define GATE_CH  36  // FlexPWM2.3 (A)
-#define GATE_CL  37  // FlexPWM2.3 (B)
+#define GATE_AH  4   // FlexPWM2.0 (A)
+#define GATE_AL  33  // FlexPWM2.0 (B)
+#define GATE_BH  6   // FlexPWM2.0 (A)
+#define GATE_BL  9   // FlexPWM2.0 (B)
+#define GATE_CH  36  // FlexPWM2.0 (A)
+#define GATE_CL  37  // FlexPWM2.0 (B)
 
 #define IRQ_PWM4_SUB0 90 // Teensy 4.1 uses IRQ #90 for FlexPWM4_0
 #define IRQ_FLAG_PIN 4 //< Irq flag 

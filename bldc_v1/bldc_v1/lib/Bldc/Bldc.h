@@ -16,7 +16,7 @@ private:
     void configurePWMs();
     void configureADCs();
     // PWM Control
-    void setGatePWM(int gate, uint16_t pwm);
+    void setGatePWM(int gate, int pwm);
     void setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c);
     // Hall sensors
     void getHalls(uint8_t &hall);

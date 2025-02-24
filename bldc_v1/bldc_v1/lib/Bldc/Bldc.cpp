@@ -31,12 +31,12 @@ void Bldc::driverInit() {
 }
 
 void Bldc::run(){
-    setGatePWM(GATE_AH, 150);
-    setGatePWM(GATE_AL, 150);
-    setGatePWM(GATE_BH, 150);
-    setGatePWM(GATE_BL, 150);
-    setGatePWM(GATE_CH, 150);
-    setGatePWM(GATE_CL, 150);
+    setGatePWM(GATE_AH, 127);
+    // setGatePWM(GATE_AL, 150);
+    // setGatePWM(GATE_BH, 150);
+    // setGatePWM(GATE_BL, 150);
+    // setGatePWM(GATE_CH, 127);
+    // setGatePWM(GATE_CL, 150);
 }
 
 
@@ -44,100 +44,186 @@ void Bldc::run(){
 ////////////////////////// PWM FUNCTIONS ///////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-void PWM4_CompletedCallback(){
+void PWM2_CompletedCallback(){
+    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
     // Reload PWM interrupt
-    IMXRT_FLEXPWM4.SM[2].STS = 0x4;
-    IMXRT_FLEXPWM4.SM[2].INTEN = 0x4;
+    IMXRT_FLEXPWM2.SM[0].STS = 0x1;
+    IMXRT_FLEXPWM2.SM[0].INTEN = 0x1;
 
     // Start measuring ADC's
     // IMXRT_ADC2.HC0 = ADC_HC_ADCH(3) | ADC_HC_ADCH(4) | ADC_HC_AIEN;
+    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
 }
 
+void flexpwmFrequencyCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
+  uint8_t channel, float frequency)
+{
+    uint16_t mask     = 1 << submodule;
+    uint16_t oldinit  = p->SM[submodule].INIT;
+    uint32_t olddiv   = (int32_t)p->SM[submodule].VAL1 - (int32_t)oldinit;
+    uint32_t newdiv   = (uint32_t)((float)F_BUS_ACTUAL / frequency + 0.5f);
+    uint32_t prescale = 0;
+
+    while (newdiv > 65535 && prescale < 7) {
+      newdiv = newdiv >> 1;
+      prescale = prescale + 1;
+    }
+
+    if (newdiv > 65535) {
+      newdiv = 65535;
+    } else if (newdiv < 2) {
+      newdiv = 2;
+    }
+    p->MCTRL |= FLEXPWM_MCTRL_CLDOK(mask);
+    p->SM[submodule].CTRL = FLEXPWM_SMCTRL_FULL | FLEXPWM_SMCTRL_PRSC(prescale);
+
+    p->SM[submodule].INIT = -(newdiv/2);
+    p->SM[submodule].VAL1 = +(newdiv/2);
+    p->SM[submodule].VAL0 = 0;
+    p->SM[submodule].VAL2 = 0;//((p->SM[submodule].VAL2 - oldinit)/2 * newdiv) / olddiv;
+    p->SM[submodule].VAL3 = 0;//((p->SM[submodule].VAL3 - oldinit)/2 * newdiv) / olddiv;
+    p->SM[submodule].VAL4 = 0;//((p->SM[submodule].VAL4 - oldinit)/2 * newdiv) / olddiv;
+    p->SM[submodule].VAL5 = 0;//((p->SM[submodule].VAL5 - oldinit)/2 * newdiv) / olddiv;
+    p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
+    //
+    #define pV (p->SM[submodule])
+}
+
+void flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
+  uint8_t channel, uint16_t val1)
+{
+  // Temporal fix
+  uint16_t val = 4095 - val1;
+  uint16_t mask = 1 << submodule;
+  uint32_t modulo = p->SM[submodule].VAL1 * 2; // - p->SM[submodule].INIT;
+  uint32_t cval = ((uint32_t)val * (modulo + 1)) >> 12/* (pwm res is the last number) analog_write_res*/;
+  if (cval > modulo) cval = modulo; // TODO: is this check correct?
+    p->MCTRL |= FLEXPWM_MCTRL_CLDOK(mask);
+    switch (channel) {
+    case 0: // X
+      p->SM[submodule].VAL0 = modulo - cval;
+      p->OUTEN |= FLEXPWM_OUTEN_PWMX_EN(mask);
+      //printf(" write channel X\n");
+      break;
+    case 1: // A
+      p->SM[submodule].VAL2 = -(cval/2);
+      p->SM[submodule].VAL3 = +(cval/2);
+      p->OUTEN |= FLEXPWM_OUTEN_PWMA_EN(mask);
+      //printf(" write channel A\n");
+      break;
+    case 2: // B
+      p->SM[submodule].VAL4 = -(cval/2);
+      p->SM[submodule].VAL5 = +(cval/2);
+      p->OUTEN |= FLEXPWM_OUTEN_PWMB_EN(mask);
+      //printf(" write channel B\n");
+  }
+  p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
+}
+
+
 void Bldc::configurePWMs() {
-    IMXRT_FLEXPWM4.SM[2].VAL0 = 0;
-    IMXRT_FLEXPWM4.SM[2].VAL1 = 4095;
-    IMXRT_FLEXPWM4.SM[2].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
-    IMXRT_FLEXPWM4.SM[2].CTRL |= FLEXPWM_SMCTRL_FULL;
-    IMXRT_FLEXPWM4.SM[2].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
-    IMXRT_FLEXPWM4.SM[2].DTCNT0 = 70;
-    IMXRT_FLEXPWM4.SM[2].DTCNT1 = 70;
+    // Check Ref Manual pg 3074 //
+    // SubModule Configuration
+    // IMXRT_FLEXPWM2.SM[0].INIT = 0;  // Provide the PWM resolution (12 bit currently)
+    // IMXRT_FLEXPWM2.SM[0].VAL0 = 127; 
+    // IMXRT_FLEXPWM2.SM[0].VAL1 = 255;
+    IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
+    IMXRT_FLEXPWM2.SM[0].CTRL = FLEXPWM_SMCTRL_HALF;
+    IMXRT_FLEXPWM2.SM[0].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
+    IMXRT_FLEXPWM2.SM[0].DTCNT0 = 70;
+    IMXRT_FLEXPWM2.SM[0].DTCNT1 = 70;
 
-    IMXRT_FLEXPWM3.SM[1].VAL0 = 0;
-    IMXRT_FLEXPWM3.SM[1].VAL1 = 4095;
-    IMXRT_FLEXPWM3.SM[1].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
-    IMXRT_FLEXPWM3.SM[1].CTRL |= FLEXPWM_SMCTRL_FULL;
-    IMXRT_FLEXPWM3.SM[1].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
-    IMXRT_FLEXPWM3.SM[1].DTCNT0 = 70;
-    IMXRT_FLEXPWM3.SM[1].DTCNT1 = 70;
+    // IMXRT_FLEXPWM2.SM[2].INIT = 0;
+    // IMXRT_FLEXPWM2.SM[2].VAL0 = 127;
+    // IMXRT_FLEXPWM2.SM[2].VAL1 = 255;
+    IMXRT_FLEXPWM2.SM[2].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
+    IMXRT_FLEXPWM2.SM[2].CTRL = FLEXPWM_SMCTRL_HALF;
+    IMXRT_FLEXPWM2.SM[2].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
+    IMXRT_FLEXPWM2.SM[2].DTCNT0 = 70;
+    IMXRT_FLEXPWM2.SM[2].DTCNT1 = 70;
 
-    IMXRT_FLEXPWM2.SM[3].VAL0 = 0;
-    IMXRT_FLEXPWM2.SM[3].VAL1 = 4095;
+    // IMXRT_FLEXPWM2.SM[3].INIT = 0;
+    // IMXRT_FLEXPWM2.SM[3].VAL0 = 127; 
+    // IMXRT_FLEXPWM2.SM[3].VAL1 = 255;
     IMXRT_FLEXPWM2.SM[3].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
-    IMXRT_FLEXPWM2.SM[3].CTRL |= FLEXPWM_SMCTRL_FULL;
+    IMXRT_FLEXPWM2.SM[3].CTRL = FLEXPWM_SMCTRL_HALF;
     IMXRT_FLEXPWM2.SM[3].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
     IMXRT_FLEXPWM2.SM[3].DTCNT0 = 70;
     IMXRT_FLEXPWM2.SM[3].DTCNT1 = 70;
     
-    IMXRT_FLEXPWM4.SM[2].STS = 0x4;
-    IMXRT_FLEXPWM4.SM[2].INTEN = 0x4;
+    // Enable interrupt for HALF (0x1) or FULL (0x2) CYCLE
+    IMXRT_FLEXPWM2.SM[0].STS = 0x1;
+    IMXRT_FLEXPWM2.SM[0].INTEN = 0x1;
     
-    IMXRT_FLEXPWM4.FCTRL0 |= FLEXPWM_FCTRL0_FLVL(4);
-    IMXRT_FLEXPWM3.FCTRL0 |= FLEXPWM_FCTRL0_FLVL(2);
-    IMXRT_FLEXPWM2.FCTRL0 |= FLEXPWM_FCTRL0_FLVL(6);
-
-    IMXRT_FLEXPWM4.SM[2].CNT = 0;
-    IMXRT_FLEXPWM3.SM[1].CNT = 0;
+    // Fault interrupt enable
+    IMXRT_FLEXPWM2.FCTRL0 |= FLEXPWM_FCTRL0_FLVL(4);
+    
+    // Initial count register
+    IMXRT_FLEXPWM2.SM[0].CNT = 0;
+    IMXRT_FLEXPWM2.SM[2].CNT = 0;
     IMXRT_FLEXPWM2.SM[3].CNT = 0;
 
     // Enable initialization by force in PWM4
-    IMXRT_FLEXPWM4.SM[2].CTRL2 &= ~FLEXPWM_SMCTRL2_FRCEN;
+    IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_FRCEN;
+    IMXRT_FLEXPWM2.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
     IMXRT_FLEXPWM2.SM[3].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
-    IMXRT_FLEXPWM3.SM[1].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
 
     // PWM4 configured to be the master 
-    IMXRT_FLEXPWM4.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(0);
+    IMXRT_FLEXPWM2.SM[0].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(0b00);
+    IMXRT_FLEXPWM2.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(0b10);
+    IMXRT_FLEXPWM2.SM[3].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(0b10);
 
     // Force select settings
-    IMXRT_FLEXPWM4.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FORCE_SEL(0);
+    IMXRT_FLEXPWM2.SM[0].CTRL2 |= FLEXPWM_SMCTRL2_FORCE_SEL(0);
+    IMXRT_FLEXPWM2.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FORCE_SEL(1);
     IMXRT_FLEXPWM2.SM[3].CTRL2 |= FLEXPWM_SMCTRL2_FORCE_SEL(1);
-    IMXRT_FLEXPWM3.SM[1].CTRL2 |= FLEXPWM_SMCTRL2_FORCE_SEL(1);
 
-    // PWM4 FORCE signal triggers synchronization
-    IMXRT_FLEXPWM4.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FORCE;
+    // PWM2 SM0 forces other submodules initialization for sync
+    IMXRT_FLEXPWM2.SM[0].CTRL2 |= FLEXPWM_SMCTRL2_FORCE;
 
-    IMXRT_FLEXPWM4.MCTRL |= FLEXPWM_MCTRL_CLDOK(4);
-    IMXRT_FLEXPWM3.MCTRL |= FLEXPWM_MCTRL_CLDOK(6);
-    IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_CLDOK(2);
-
-    IMXRT_FLEXPWM4.MCTRL |= FLEXPWM_MCTRL_LDOK(4);
-    IMXRT_FLEXPWM3.MCTRL |= FLEXPWM_MCTRL_LDOK(2);
-    IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_LDOK(6);
+    // Load ready flags
+    IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_RUN((1<<0) | (1<<2) | (1<<3));
+    IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_CLDOK((1<<0) | (1<<2) | (1<<3));
+    IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_LDOK((1<<0) | (1<<2) | (1<<3));
 
     // Enable Hardware trigger for ADC conversions when VAL1 is reached (PWM_OUT_TRIG1)
-    IMXRT_FLEXPWM4.SM[2].TCTRL |= FLEXPWM_SMTCTRL_OUT_TRIG_EN(1); 
+    IMXRT_FLEXPWM2.SM[0].TCTRL |= FLEXPWM_SMTCTRL_OUT_TRIG_EN(0); 
 
-    IMXRT_FLEXPWM4.MCTRL |= FLEXPWM_MCTRL_RUN(4);
-    IMXRT_FLEXPWM3.MCTRL |= FLEXPWM_MCTRL_RUN(2);
-    IMXRT_FLEXPWM2.MCTRL |= FLEXPWM_MCTRL_RUN(6);
-    
-    IMXRT_FLEXPWM4.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 4) | FLEXPWM_OUTEN_PWMB_EN(1 << 4);
-    IMXRT_FLEXPWM3.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 2) | FLEXPWM_OUTEN_PWMB_EN(1 << 2);
-    IMXRT_FLEXPWM2.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 6) | FLEXPWM_OUTEN_PWMB_EN(1 << 6);
+    attachInterruptVector(IRQ_FLEXPWM2_0, PWM2_CompletedCallback);
+    NVIC_ENABLE_IRQ(IRQ_FLEXPWM2_0);
 
-    attachInterruptVector(IRQ_FLEXPWM4_2, PWM4_CompletedCallback);
-    NVIC_ENABLE_IRQ(IRQ_FLEXPWM4_2);
+    #define M(a, b) ((((a) - 1) << 4) | (b))
+    flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, 30000);
+    flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, 30000);
+    flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 30000);
+    flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 30000);
+    flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 30000);
+    flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 30000);
+
+    analogWrite(GATE_AH, 0);
+    analogWrite(GATE_AL, 0);
+    analogWrite(GATE_BH, 0);
+    analogWrite(GATE_BL, 0);
+    analogWrite(GATE_CH, 0);
+    analogWrite(GATE_CL, 0);
     
+    //Enable outputs in A and B 
+    IMXRT_FLEXPWM2.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 3) | FLEXPWM_OUTEN_PWMB_EN(1 << 3) 
+                         | FLEXPWM_OUTEN_PWMA_EN(1 << 2) | FLEXPWM_OUTEN_PWMB_EN(1 << 2)
+                         | FLEXPWM_OUTEN_PWMA_EN(1) | FLEXPWM_OUTEN_PWMB_EN(1);
+
     delay(1);
-    setGatePWM(GATE_AH, 0);
-    setGatePWM(GATE_AL, 0);
-    setGatePWM(GATE_BH, 0);
-    setGatePWM(GATE_BL, 0);
-    setGatePWM(GATE_CH, 0);
-    setGatePWM(GATE_CL, 0);
 }
 
-void Bldc::setGatePWM(int gate, uint16_t pwm){
-    analogWrite(gate, pwm);
+void Bldc::setGatePWM(int gate, int pwm){
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, 1050);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, 1050);
+
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 1050);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 1050);
+
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 1050);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 1050);
 }
 
 void Bldc::setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c){
@@ -166,14 +252,14 @@ void ADC2_CompletedConversionCallback(){
 
 
 void adcetc0_isr() {
-    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
     ADC_ETC_DONE0_1_IRQ |= 1;   // clear
     uint16_t val0 = ADC_ETC_TRIG1_RESULT_1_0 & 4095;
     asm("dsb");
   }
   
   void adcetc1_isr() {
-    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
     ADC_ETC_DONE0_1_IRQ |= 1 << 16;   // clear
     uint16_t val1 = (ADC_ETC_TRIG1_RESULT_1_0 >> 16) & 4095;
     asm("dsb");
