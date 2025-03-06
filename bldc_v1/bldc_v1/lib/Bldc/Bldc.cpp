@@ -124,27 +124,19 @@ void flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
 void Bldc::configurePWMs() {
     // Check Ref Manual pg 3074 //
     // SubModule Configuration
-    // IMXRT_FLEXPWM2.SM[0].INIT = 0;  // Provide the PWM resolution (12 bit currently)
-    // IMXRT_FLEXPWM2.SM[0].VAL0 = 127; 
-    // IMXRT_FLEXPWM2.SM[0].VAL1 = 255;
+
     IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
     IMXRT_FLEXPWM2.SM[0].CTRL = FLEXPWM_SMCTRL_HALF;
     IMXRT_FLEXPWM2.SM[0].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
     IMXRT_FLEXPWM2.SM[0].DTCNT0 = 70;
     IMXRT_FLEXPWM2.SM[0].DTCNT1 = 70;
 
-    // IMXRT_FLEXPWM2.SM[2].INIT = 0;
-    // IMXRT_FLEXPWM2.SM[2].VAL0 = 127;
-    // IMXRT_FLEXPWM2.SM[2].VAL1 = 255;
     IMXRT_FLEXPWM2.SM[2].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
     IMXRT_FLEXPWM2.SM[2].CTRL = FLEXPWM_SMCTRL_HALF;
     IMXRT_FLEXPWM2.SM[2].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
     IMXRT_FLEXPWM2.SM[2].DTCNT0 = 70;
     IMXRT_FLEXPWM2.SM[2].DTCNT1 = 70;
 
-    // IMXRT_FLEXPWM2.SM[3].INIT = 0;
-    // IMXRT_FLEXPWM2.SM[3].VAL0 = 127; 
-    // IMXRT_FLEXPWM2.SM[3].VAL1 = 255;
     IMXRT_FLEXPWM2.SM[3].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
     IMXRT_FLEXPWM2.SM[3].CTRL = FLEXPWM_SMCTRL_HALF;
     IMXRT_FLEXPWM2.SM[3].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
@@ -158,15 +150,10 @@ void Bldc::configurePWMs() {
     // Fault interrupt enable
     IMXRT_FLEXPWM2.FCTRL0 |= FLEXPWM_FCTRL0_FLVL(4);
     
-    // Initial count register
-    IMXRT_FLEXPWM2.SM[0].CNT = 0;
-    IMXRT_FLEXPWM2.SM[2].CNT = 0;
-    IMXRT_FLEXPWM2.SM[3].CNT = 0;
-
-    // Enable initialization by force in PWM4
-    IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_FRCEN;
-    IMXRT_FLEXPWM2.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
-    IMXRT_FLEXPWM2.SM[3].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
+    // Enable initialization by force in PWM4 (ESTOOOOO NOOOOO)
+    // IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_FRCEN;
+    // IMXRT_FLEXPWM2.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
+    // IMXRT_FLEXPWM2.SM[3].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
 
     // PWM4 configured to be the master 
     IMXRT_FLEXPWM2.SM[0].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(0b00);
@@ -219,11 +206,11 @@ void Bldc::setGatePWM(int gate, int pwm){
   flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, 1050);
   flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, 1050);
 
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 1050);
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 1050);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 500);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 500);
 
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 1050);
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 1050);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 150);
+  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 150);
 }
 
 void Bldc::setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c){
