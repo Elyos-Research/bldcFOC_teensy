@@ -25,6 +25,8 @@ private:
     void readThrottle(uint16_t &throttle);
     void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
 
+    void flexpwmFrequencyCA(IMXRT_FLEXPWM_t*p, unsigned int submodule, uint8_t channel, float freq);
+    void flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule, uint8_t channel, uint16_t val1);
 public:
     enum ControlType { Trap, Foc };
     ControlType controlType;

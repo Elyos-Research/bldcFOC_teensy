@@ -31,12 +31,15 @@ void Bldc::driverInit() {
 }
 
 void Bldc::run(){
-    setGatePWM(GATE_AH, 127);
-    // setGatePWM(GATE_AL, 150);
-    // setGatePWM(GATE_BH, 150);
-    // setGatePWM(GATE_BL, 150);
-    // setGatePWM(GATE_CH, 127);
-    // setGatePWM(GATE_CL, 150);
+  /*1-4000*/
+    setGatePWM(GATE_AH, 3000);
+    setGatePWM(GATE_AL, 3000);
+
+    setGatePWM(GATE_BH, 1000);
+    setGatePWM(GATE_BL, 1000);
+
+    setGatePWM(GATE_CH, 100);
+    setGatePWM(GATE_CL, 100);
 }
 
 
@@ -55,8 +58,7 @@ void PWM2_CompletedCallback(){
     digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
 }
 
-void flexpwmFrequencyCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
-  uint8_t channel, float frequency)
+void Bldc::flexpwmFrequencyCA( IMXRT_FLEXPWM_t *p, unsigned int submodule, uint8_t channel, float frequency)
 {
     uint16_t mask     = 1 << submodule;
     uint16_t oldinit  = p->SM[submodule].INIT;
@@ -80,16 +82,16 @@ void flexpwmFrequencyCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
     p->SM[submodule].INIT = -(newdiv/2);
     p->SM[submodule].VAL1 = +(newdiv/2);
     p->SM[submodule].VAL0 = 0;
-    p->SM[submodule].VAL2 = 0;//((p->SM[submodule].VAL2 - oldinit)/2 * newdiv) / olddiv;
-    p->SM[submodule].VAL3 = 0;//((p->SM[submodule].VAL3 - oldinit)/2 * newdiv) / olddiv;
-    p->SM[submodule].VAL4 = 0;//((p->SM[submodule].VAL4 - oldinit)/2 * newdiv) / olddiv;
-    p->SM[submodule].VAL5 = 0;//((p->SM[submodule].VAL5 - oldinit)/2 * newdiv) / olddiv;
+    p->SM[submodule].VAL2 = 0;
+    p->SM[submodule].VAL3 = 0;
+    p->SM[submodule].VAL4 = 0;
+    p->SM[submodule].VAL5 = 0;
     p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
-    //
+    
     #define pV (p->SM[submodule])
 }
 
-void flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
+void Bldc::flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
   uint8_t channel, uint16_t val1)
 {
   // Temporal fix
@@ -103,28 +105,23 @@ void flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule,
     case 0: // X
       p->SM[submodule].VAL0 = modulo - cval;
       p->OUTEN |= FLEXPWM_OUTEN_PWMX_EN(mask);
-      //printf(" write channel X\n");
       break;
     case 1: // A
       p->SM[submodule].VAL2 = -(cval/2);
       p->SM[submodule].VAL3 = +(cval/2);
       p->OUTEN |= FLEXPWM_OUTEN_PWMA_EN(mask);
-      //printf(" write channel A\n");
       break;
     case 2: // B
       p->SM[submodule].VAL4 = -(cval/2);
       p->SM[submodule].VAL5 = +(cval/2);
       p->OUTEN |= FLEXPWM_OUTEN_PWMB_EN(mask);
-      //printf(" write channel B\n");
   }
   p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
+  #define portConfigRegister(pin)  ((digital_pin_to_info_PGM[(pin)].mux))
 }
-
 
 void Bldc::configurePWMs() {
     // Check Ref Manual pg 3074 //
-    // SubModule Configuration
-
     IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_INDEP;
     IMXRT_FLEXPWM2.SM[0].CTRL = FLEXPWM_SMCTRL_HALF;
     IMXRT_FLEXPWM2.SM[0].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
@@ -149,11 +146,6 @@ void Bldc::configurePWMs() {
     
     // Fault interrupt enable
     IMXRT_FLEXPWM2.FCTRL0 |= FLEXPWM_FCTRL0_FLVL(4);
-    
-    // Enable initialization by force in PWM4 (ESTOOOOO NOOOOO)
-    // IMXRT_FLEXPWM2.SM[0].CTRL2 &= ~FLEXPWM_SMCTRL2_FRCEN;
-    // IMXRT_FLEXPWM2.SM[2].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
-    // IMXRT_FLEXPWM2.SM[3].CTRL2 |= FLEXPWM_SMCTRL2_FRCEN;
 
     // PWM4 configured to be the master 
     IMXRT_FLEXPWM2.SM[0].CTRL2 |= FLEXPWM_SMCTRL2_INIT_SEL(0b00);
@@ -175,10 +167,11 @@ void Bldc::configurePWMs() {
 
     // Enable Hardware trigger for ADC conversions when VAL1 is reached (PWM_OUT_TRIG1)
     IMXRT_FLEXPWM2.SM[0].TCTRL |= FLEXPWM_SMTCTRL_OUT_TRIG_EN(0); 
-
+    // Set PWM Interrupt (configured to mid cycle)
     attachInterruptVector(IRQ_FLEXPWM2_0, PWM2_CompletedCallback);
     NVIC_ENABLE_IRQ(IRQ_FLEXPWM2_0);
 
+    // Set PWM frequencies 
     #define M(a, b) ((((a) - 1) << 4) | (b))
     flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, 30000);
     flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, 30000);
@@ -187,12 +180,22 @@ void Bldc::configurePWMs() {
     flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 30000);
     flexpwmFrequencyCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 30000);
 
-    analogWrite(GATE_AH, 0);
-    analogWrite(GATE_AL, 0);
-    analogWrite(GATE_BH, 0);
-    analogWrite(GATE_BL, 0);
-    analogWrite(GATE_CH, 0);
-    analogWrite(GATE_CL, 0);
+    // Write zeros to everything
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, 0);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, 0);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 0);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 0);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 0);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 0);
+
+    // Configure signal propagation to pads
+    #define portConfigRegister(pin)  ((digital_pin_to_info_PGM[(pin)].mux))
+    *(portConfigRegister(4)) =  1;  // GATE AH
+    *(portConfigRegister(33)) = 1;  // GATE AL
+    *(portConfigRegister(6)) =  2;  // GATE BH
+    *(portConfigRegister(9)) =  2;  // GATE BL
+    *(portConfigRegister(36)) = 6;  // GATE CH
+    *(portConfigRegister(37)) = 6;  // GATE CL
     
     //Enable outputs in A and B 
     IMXRT_FLEXPWM2.OUTEN |= FLEXPWM_OUTEN_PWMA_EN(1 << 3) | FLEXPWM_OUTEN_PWMB_EN(1 << 3) 
@@ -203,14 +206,21 @@ void Bldc::configurePWMs() {
 }
 
 void Bldc::setGatePWM(int gate, int pwm){
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, 1050);
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, 1050);
-
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 500);
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 500);
-
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 150);
-  flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 150);
+  if (gate == GATE_AH || gate == GATE_AL)
+  {
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, pwm);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, pwm);
+  }
+  if (gate == GATE_BH || gate == GATE_BL)
+  {
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, 500);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, 500);
+  }
+  if (gate == GATE_CH || gate == GATE_CL)
+  {
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, 150);
+    flexpwmWriteCA(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, 150);
+  }
 }
 
 void Bldc::setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c){
@@ -241,14 +251,14 @@ void ADC2_CompletedConversionCallback(){
 void adcetc0_isr() {
     //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
     ADC_ETC_DONE0_1_IRQ |= 1;   // clear
-    uint16_t val0 = ADC_ETC_TRIG1_RESULT_1_0 & 4095;
+    const uint16_t val0 = ADC_ETC_TRIG1_RESULT_1_0 & 4095;
     asm("dsb");
   }
   
   void adcetc1_isr() {
     //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
     ADC_ETC_DONE0_1_IRQ |= 1 << 16;   // clear
-    uint16_t val1 = (ADC_ETC_TRIG1_RESULT_1_0 >> 16) & 4095;
+    const uint16_t val1 = (ADC_ETC_TRIG1_RESULT_1_0 >> 16) & 4095;
     asm("dsb");
   }
 
