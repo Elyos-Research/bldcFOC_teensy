@@ -1,5 +1,7 @@
 #include "Bldc.h"
 
+
+
 extern "C" {
     extern  void xbar_connect(unsigned int input, unsigned int output);
 }
@@ -30,8 +32,129 @@ void Bldc::driverInit() {
     Serial.println("init");
 }
 
+
+
+
+////////////////////////////////////////////////////////////////////
+////////////////////////// ADC FUNCTIONS /////////////////////////// 
+////////////////////////////////////////////////////////////////////
+
+
+
+void Bldc::configureADCs(){
+
+    uint32_t mode, avg = 0;
+    mode = ADC_CFG_ADICLK(0b00) | ADC_CFG_MODE(0b10) | ADC_CFG_ADLSMP | ADC_CFG_ADIV(0b00) | ADC_CFG_ADSTS(0b11) | ADC_CFG_AVGS(0b10) | ADC_CFG_OVWREN;  // | ADC_CFG_ADTRG
+		avg = ADC_GC_AVGE | ADC_GC_ADCO | ADC_GC_CAL;
+    
+
+    // Configure ADC1
+    ADC1_CFG = mode;
+    ADC1_GC = avg;  
+    while (ADC1_GC & ADC_GC_CAL) {
+        yield();  // Wait until calibration is complete
+    }
+
+    // Configure ADC2
+    ADC2_CFG = mode; 
+    ADC2_GC = avg;     
+    while (ADC2_GC & ADC_GC_CAL) {
+        yield();  // Wait until calibration is complete
+    }
+
+    //PAG 3356
+    ADC1_HC1 = ADC_HC_ADCH(0b00001) | ADC_HC_AIEN;
+    ADC1_HC2 = ADC_HC_ADCH(0b00010) | ADC_HC_AIEN;
+    ADC1_HC3 = ADC_HC_ADCH(0b00011) | ADC_HC_AIEN;
+    ADC1_HC4 = ADC_HC_ADCH(0b00100) | ADC_HC_AIEN;
+
+
+   
+    // // Register Interrupt 
+    // // attachInterruptVector(IRQ_ADC2, ADC2_CompletedConversionCallback);
+    // // NVIC_ENABLE_IRQ(IRQ_ADC2);
+
+    // // Soft Reset the ADC_ETC module
+    // IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_SOFTRST;  
+    // IMXRT_ADC_ETC.CTRL &= ~ADC_ETC_CTRL_SOFTRST; 
+    // delay(5);
+    // // Enable External Signal Controller 1
+    // //ADC_ETC_TRIG0_CTRL = 0x100;
+    // IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_TRIG_ENABLE((1 << 1));
+    // //ADC_ETC_TRIG0_CHAIN_1_0 = 0x50283017;
+
+    // // IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
+    // IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
+    // ADC_ETC_TRIG_CHAIN_IE0(1)  /* Enable interrupt for first conversion */
+    // | ADC_ETC_TRIG_CHAIN_HWTS0(1)  /* Select Hardware Trigger Source 0 */
+    // | ADC_ETC_TRIG_CHAIN_CSEL0(1)  /* First conversion: ADC2 channel 1 */
+    
+    // | ADC_ETC_TRIG_CHAIN_IE1(1)  /* Enable interrupt for second conversion */
+    // | ADC_ETC_TRIG_CHAIN_CSEL1(3)  /* Second conversion: ADC2 channel 3 */
+    // ;
+    
+    // // START ADC's
+    // //ADC2_HC0 = 16;
+    // IMXRT_ADC2.HC0 = ADC_HC_ADCH(1) | ADC_HC_AIEN;
+    // //IMXRT_ADC2.HC1 = ADC_HC_ADCH(3) | ADC_HC_AIEN;
+    // //IMXRT_ADC2.HC2 = ADC_HC_ADCH(4) | ADC_HC_AIEN;
+
+    // // Link external trigger interrupt to callback
+    // // attachInterruptVector(IRQ_ADC_ETC0, ADC2_CompletedConversionCallback);
+    // // NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
+    // // attachInterruptVector(IRQ_ADC_ETC1, ADC2_CompletedConversionCallback);
+    // // NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+
+    // attachInterruptVector(IRQ_ADC_ETC0, adcetc0_isr);
+    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
+    // attachInterruptVector(IRQ_ADC_ETC1, adcetc1_isr);
+    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+}
+
+void Bldc::readThrottle(uint16_t &throttle){
+    uint16_t throttle_raw = analogRead(THROTTLE_PIN);
+    uint16_t lowBound = (throttle_raw - THROTTLE_LOW);
+    if(lowBound < 0){ lowBound = 0;}
+    throttle_raw = lowBound * (THROTTLE_HIGH + 1) / (THROTTLE_HIGH - THROTTLE_LOW);
+    throttle_raw = lowBound * THROTTLE_HIGH / THROTTLE_RESOLUTION;
+    if (throttle_raw > THROTTLE_RESOLUTION){ throttle_raw = 0;}    
+    Serial.println(throttle_raw);
+}
+
+void Bldc::readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC){
+    currentA = analogRead(CURRENT_SENSE_A);
+    currentB = analogRead(CURRENT_SENSE_B);
+    currentC = analogRead(CURRENT_SENSE_C);
+}
+
+
+
+
+
+
+
+
+int readADCxd(u_int16_t gpio){
+  if(gpio == THROTTLE_PIN){
+    ADC1_HC0 = 1;
+    while (!(ADC1_HS & ADC_HS_COCO0)) {
+      yield(); // TODO: what happens if yield-called code uses analogRead()
+    }
+    return ADC1_R0;
+  }
+  return 0;
+}
+
+
+
+
+
+
+
+
 void Bldc::run(){
   /*1-4000*/
+  uint16_t th;
     setGatePWM(GATE_AH, 3000);
     setGatePWM(GATE_AL, 3000);
 
@@ -40,7 +163,73 @@ void Bldc::run(){
 
     setGatePWM(GATE_CH, 100);
     setGatePWM(GATE_CL, 100);
+    // readThrottle(th);
+    int val;
+    val = readADCxd(THROTTLE_PIN);
+    Serial.println(val);
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////
+////////////////////// HALL SENSOR HANDLING //////////////////////// 
+////////////////////////////////////////////////////////////////////
+
+void Bldc::identifyHalls(uint8_t &current_hall_state){
+    uint8_t aux = ((digitalRead(HALL_A_PIN) << 2) | (digitalRead(HALL_B_PIN) << 1) | (digitalRead(HALL_C_PIN)));
+    if(aux == 0 || aux == 7) return;  // Discard invalid positions
+    current_hall_state = aux;
+}
+
+void Bldc::getHalls(uint8_t &hall){
+    uint8_t hallCounts[] = {0, 0, 0};
+
+    for (uint8_t i = 0; i < HALL_OVERSAMPLE; i++) {
+        hallCounts[0] += digitalRead(HALL_A_PIN);
+        hallCounts[1] += digitalRead(HALL_B_PIN);
+        hallCounts[2] += digitalRead(HALL_C_PIN);
+    }
+    hall = (hallCounts[0] > HALL_OVERSAMPLE / 2) << 0 |
+           (hallCounts[1] > HALL_OVERSAMPLE / 2) << 1 |
+           (hallCounts[2] > HALL_OVERSAMPLE / 2) << 2;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ////////////////////////////////////////////////////////////////////
@@ -48,14 +237,14 @@ void Bldc::run(){
 ////////////////////////////////////////////////////////////////////
 
 void PWM2_CompletedCallback(){
-    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
     // Reload PWM interrupt
     IMXRT_FLEXPWM2.SM[0].STS = 0x1;
     IMXRT_FLEXPWM2.SM[0].INTEN = 0x1;
 
     // Start measuring ADC's
     // IMXRT_ADC2.HC0 = ADC_HC_ADCH(3) | ADC_HC_ADCH(4) | ADC_HC_AIEN;
-    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
 }
 
 void Bldc::flexpwmFrequencyCA( IMXRT_FLEXPWM_t *p, unsigned int submodule, uint8_t channel, float frequency)
@@ -230,125 +419,4 @@ void Bldc::setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, 
     setGatePWM(GATE_BL, l_b);
     setGatePWM(GATE_CH, h_c);
     setGatePWM(GATE_CL, l_c);
-}
-
-
-////////////////////////////////////////////////////////////////////
-////////////////////////// ADC FUNCTIONS /////////////////////////// 
-////////////////////////////////////////////////////////////////////
-
-void ADC2_CompletedConversionCallback(){
-    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
-
-    // Get ADC value from register
-    uint16_t val = (ADC_ETC_TRIG0_RESULT_1_0 >> 16) & 4095;  
-    // Clear ISR flag
-    ADC_ETC_DONE0_1_IRQ |= 1 << 16;  
-    asm("dsb");
-}   
-
-
-void adcetc0_isr() {
-    //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
-    ADC_ETC_DONE0_1_IRQ |= 1;   // clear
-    const uint16_t val0 = ADC_ETC_TRIG1_RESULT_1_0 & 4095;
-    asm("dsb");
-  }
-  
-  void adcetc1_isr() {
-    //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
-    ADC_ETC_DONE0_1_IRQ |= 1 << 16;   // clear
-    const uint16_t val1 = (ADC_ETC_TRIG1_RESULT_1_0 >> 16) & 4095;
-    asm("dsb");
-  }
-
-void Bldc::configureADCs(){
-    // Use XBAR to connect PWM4.2 to ADC ETC 0
-    CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);
-    xbar_connect(XBARA1_IN_FLEXPWM4_PWM2_OUT_TRIG1, XBARA1_OUT_ADC_ETC_TRIG10);
-
-    // Configure ADC2 oversample and 12 bit conversion
-    IMXRT_ADC2.CFG = ADC_CFG_AVGS(0b01) | ADC_CFG_MODE(0b10) | ADC_CFG_ADTRG;
-    // Continuous conversion and enable averaging by hardware
-    IMXRT_ADC2.GC = ADC_GC_AVGE;  // ADC_GC_ADCO | 
-
-    // Register Interrupt 
-    // attachInterruptVector(IRQ_ADC2, ADC2_CompletedConversionCallback);
-    // NVIC_ENABLE_IRQ(IRQ_ADC2);
-
-    // Soft Reset the ADC_ETC module
-    IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_SOFTRST;  
-    IMXRT_ADC_ETC.CTRL &= ~ADC_ETC_CTRL_SOFTRST; 
-    delay(5);
-    // Enable External Signal Controller 1
-    //ADC_ETC_TRIG0_CTRL = 0x100;
-    IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_TRIG_ENABLE((1 << 1));
-    //ADC_ETC_TRIG0_CHAIN_1_0 = 0x50283017;
-
-    // IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
-    IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
-    ADC_ETC_TRIG_CHAIN_IE0(1)  /* Enable interrupt for first conversion */
-    | ADC_ETC_TRIG_CHAIN_HWTS0(1)  /* Select Hardware Trigger Source 0 */
-    | ADC_ETC_TRIG_CHAIN_CSEL0(1)  /* First conversion: ADC2 channel 1 */
-    
-    | ADC_ETC_TRIG_CHAIN_IE1(1)  /* Enable interrupt for second conversion */
-    | ADC_ETC_TRIG_CHAIN_CSEL1(3)  /* Second conversion: ADC2 channel 3 */
-    ;
-    
-    // START ADC's
-    //ADC2_HC0 = 16;
-    IMXRT_ADC2.HC0 = ADC_HC_ADCH(1) | ADC_HC_AIEN;
-    //IMXRT_ADC2.HC1 = ADC_HC_ADCH(3) | ADC_HC_AIEN;
-    //IMXRT_ADC2.HC2 = ADC_HC_ADCH(4) | ADC_HC_AIEN;
-
-    // Link external trigger interrupt to callback
-    // attachInterruptVector(IRQ_ADC_ETC0, ADC2_CompletedConversionCallback);
-    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-    // attachInterruptVector(IRQ_ADC_ETC1, ADC2_CompletedConversionCallback);
-    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
-
-    attachInterruptVector(IRQ_ADC_ETC0, adcetc0_isr);
-    NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-    attachInterruptVector(IRQ_ADC_ETC1, adcetc1_isr);
-    NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
-}
-
-void Bldc::readThrottle(uint16_t &throttle){
-    uint16_t throttle_raw = analogRead(THROTTLE_PIN);
-    uint16_t lowBound = (throttle_raw - THROTTLE_LOW);
-    if(lowBound < 0){ lowBound = 0;}
-    throttle_raw = lowBound * (THROTTLE_HIGH + 1) / (THROTTLE_HIGH - THROTTLE_LOW);
-    throttle_raw = lowBound * THROTTLE_HIGH / THROTTLE_RESOLUTION;
-    if (throttle_raw > THROTTLE_RESOLUTION){ throttle_raw = 0;}    
-    Serial.println(throttle_raw);
-}
-
-void Bldc::readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC){
-    currentA = analogRead(CURRENT_SENSE_A);
-    currentB = analogRead(CURRENT_SENSE_B);
-    currentC = analogRead(CURRENT_SENSE_C);
-}
-
-
-////////////////////////////////////////////////////////////////////
-////////////////////// HALL SENSOR HANDLING //////////////////////// 
-////////////////////////////////////////////////////////////////////
-
-void Bldc::identifyHalls(uint8_t &current_hall_state){
-    uint8_t aux = ((digitalRead(HALL_A_PIN) << 2) | (digitalRead(HALL_B_PIN) << 1) | (digitalRead(HALL_C_PIN)));
-    if(aux == 0 || aux == 7) return;  // Discard invalid positions
-    current_hall_state = aux;
-}
-
-void Bldc::getHalls(uint8_t &hall){
-    uint8_t hallCounts[] = {0, 0, 0};
-
-    for (uint8_t i = 0; i < HALL_OVERSAMPLE; i++) {
-        hallCounts[0] += digitalRead(HALL_A_PIN);
-        hallCounts[1] += digitalRead(HALL_B_PIN);
-        hallCounts[2] += digitalRead(HALL_C_PIN);
-    }
-    hall = (hallCounts[0] > HALL_OVERSAMPLE / 2) << 0 |
-           (hallCounts[1] > HALL_OVERSAMPLE / 2) << 1 |
-           (hallCounts[2] > HALL_OVERSAMPLE / 2) << 2;
 }
