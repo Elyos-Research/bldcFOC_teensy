@@ -30,6 +30,10 @@ void Bldc::driverInit() {
 
     Serial.begin(115200);
     Serial.println("init");
+    uint8_t ch;
+    ch = 0x01;
+    ch |= 1 << 7;
+    ADC1_HC0 = ch;
 }
 
 
@@ -39,13 +43,20 @@ void Bldc::driverInit() {
 ////////////////////////// ADC FUNCTIONS /////////////////////////// 
 ////////////////////////////////////////////////////////////////////
 
+void ADC1_CompletedConversionCallback(){
+    digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    if (ADC1_HS & ADC_HS_COCO0) {  // Check if HC[1] conversion is complete
+        uint32_t result1 = ADC1_R0;  
+    }
+}
+   
 
 
 void Bldc::configureADCs(){
 
     uint32_t mode, avg = 0;
     mode = ADC_CFG_ADICLK(0b00) | ADC_CFG_MODE(0b10) | ADC_CFG_ADLSMP | ADC_CFG_ADIV(0b00) | ADC_CFG_ADSTS(0b11) | ADC_CFG_AVGS(0b10) | ADC_CFG_OVWREN;  // | ADC_CFG_ADTRG
-		avg = ADC_GC_AVGE | ADC_GC_ADCO | ADC_GC_CAL;
+		avg = ADC_GC_AVGE & ~ADC_GC_ADCO | ADC_GC_CAL;
     
     // Configure ADC1
     ADC1_CFG = mode;
@@ -61,53 +72,12 @@ void Bldc::configureADCs(){
         yield();  // Wait until calibration is complete
     }
 
-    //PAG 3356
-    ADC1_HC1 = ADC_HC_ADCH(0b00001) | ADC_HC_AIEN;
-    ADC1_HC2 = ADC_HC_ADCH(0b00010) | ADC_HC_AIEN;
-    ADC1_HC3 = ADC_HC_ADCH(0b00011) | ADC_HC_AIEN;
-    ADC1_HC4 = ADC_HC_ADCH(0b00100) | ADC_HC_AIEN;
+    //PAG 3356        ADC1_HC1, 2, 3, etc
 
 
-   
     // // Register Interrupt 
-    // // attachInterruptVector(IRQ_ADC2, ADC2_CompletedConversionCallback);
-    // // NVIC_ENABLE_IRQ(IRQ_ADC2);
-
-    // // Soft Reset the ADC_ETC module
-    // IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_SOFTRST;  
-    // IMXRT_ADC_ETC.CTRL &= ~ADC_ETC_CTRL_SOFTRST; 
-    // delay(5);
-    // // Enable External Signal Controller 1
-    // //ADC_ETC_TRIG0_CTRL = 0x100;
-    // IMXRT_ADC_ETC.CTRL = ADC_ETC_CTRL_TRIG_ENABLE((1 << 1));
-    // //ADC_ETC_TRIG0_CHAIN_1_0 = 0x50283017;
-
-    // // IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
-    // IMXRT_ADC_ETC.TRIG[1].CHAIN_1_0 =
-    // ADC_ETC_TRIG_CHAIN_IE0(1)  /* Enable interrupt for first conversion */
-    // | ADC_ETC_TRIG_CHAIN_HWTS0(1)  /* Select Hardware Trigger Source 0 */
-    // | ADC_ETC_TRIG_CHAIN_CSEL0(1)  /* First conversion: ADC2 channel 1 */
-    
-    // | ADC_ETC_TRIG_CHAIN_IE1(1)  /* Enable interrupt for second conversion */
-    // | ADC_ETC_TRIG_CHAIN_CSEL1(3)  /* Second conversion: ADC2 channel 3 */
-    // ;
-    
-    // // START ADC's
-    // //ADC2_HC0 = 16;
-    // IMXRT_ADC2.HC0 = ADC_HC_ADCH(1) | ADC_HC_AIEN;
-    // //IMXRT_ADC2.HC1 = ADC_HC_ADCH(3) | ADC_HC_AIEN;
-    // //IMXRT_ADC2.HC2 = ADC_HC_ADCH(4) | ADC_HC_AIEN;
-
-    // // Link external trigger interrupt to callback
-    // // attachInterruptVector(IRQ_ADC_ETC0, ADC2_CompletedConversionCallback);
-    // // NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-    // // attachInterruptVector(IRQ_ADC_ETC1, ADC2_CompletedConversionCallback);
-    // // NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
-
-    // attachInterruptVector(IRQ_ADC_ETC0, adcetc0_isr);
-    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC0);
-    // attachInterruptVector(IRQ_ADC_ETC1, adcetc1_isr);
-    // NVIC_ENABLE_IRQ(IRQ_ADC_ETC1);
+    attachInterruptVector(IRQ_ADC1, ADC1_CompletedConversionCallback);
+    NVIC_ENABLE_IRQ(IRQ_ADC1);
 }
 
 void Bldc::readThrottle(uint16_t &throttle){
@@ -137,6 +107,7 @@ int readADCxd(u_int16_t gpio){
   uint8_t ch;
   if(gpio == THROTTLE_PIN){
     ch = 0x01;
+    ch |= 1 << 7;
     ADC1_HC0 = ch;
     while (!(ADC1_HS & ADC_HS_COCO0)) {
       yield(); 
@@ -145,7 +116,7 @@ int readADCxd(u_int16_t gpio){
   }
 
   if(gpio == CURRENT_SENSE_A){
-    ch = 0x83;
+    ch = 0x03; 
     ADC2_HC0 = ch;
     while (!(ADC2_HS & ADC_HS_COCO0)) {
       yield(); 
@@ -154,7 +125,7 @@ int readADCxd(u_int16_t gpio){
   }
 
   if(gpio == CURRENT_SENSE_B){
-    ch = 0x84;
+    ch = 0x04;
     ADC2_HC0 = ch;
     while (!(ADC2_HS & ADC_HS_COCO0)) {
       yield(); 
@@ -163,7 +134,7 @@ int readADCxd(u_int16_t gpio){
   }
 
   if(gpio == CURRENT_SENSE_C){
-    ch = 0x81;
+    ch = 0x01;
     ADC2_HC0 = ch;
     while (!(ADC2_HS & ADC_HS_COCO0)) {
       yield();
@@ -172,7 +143,6 @@ int readADCxd(u_int16_t gpio){
   }
   return 0;
 }
-
 
 
 
@@ -190,9 +160,9 @@ void Bldc::run(){
 
     setGatePWM(GATE_CH, 100);
     setGatePWM(GATE_CL, 100);
-    int val;
-    val = readADCxd(THROTTLE_PIN);
-    Serial.println(val);
+    // int val;
+    // val = readADCxd(THROTTLE_PIN);
+    // Serial.println(val);
 
 }
 
@@ -271,6 +241,10 @@ void PWM2_CompletedCallback(){
     // Start measuring ADC's
     // IMXRT_ADC2.HC0 = ADC_HC_ADCH(3) | ADC_HC_ADCH(4) | ADC_HC_AIEN;
     //digitalWrite(BUILTIN_LED_PIN, !digitalRead(BUILTIN_LED_PIN));
+    uint8_t ch;
+    ch = 0x01;
+    ch |= 1 << 7;
+    ADC1_HC0 = ch;
 }
 
 void Bldc::flexpwmFrequencyCA( IMXRT_FLEXPWM_t *p, unsigned int submodule, uint8_t channel, float frequency)
