@@ -47,7 +47,6 @@ void Bldc::configureADCs(){
     mode = ADC_CFG_ADICLK(0b00) | ADC_CFG_MODE(0b10) | ADC_CFG_ADLSMP | ADC_CFG_ADIV(0b00) | ADC_CFG_ADSTS(0b11) | ADC_CFG_AVGS(0b10) | ADC_CFG_OVWREN;  // | ADC_CFG_ADTRG
 		avg = ADC_GC_AVGE | ADC_GC_ADCO | ADC_GC_CAL;
     
-
     // Configure ADC1
     ADC1_CFG = mode;
     ADC1_GC = avg;  
@@ -112,7 +111,7 @@ void Bldc::configureADCs(){
 }
 
 void Bldc::readThrottle(uint16_t &throttle){
-    uint16_t throttle_raw = analogRead(THROTTLE_PIN);
+    uint16_t throttle_raw = analogRead(CURRENT_SENSE_C);
     uint16_t lowBound = (throttle_raw - THROTTLE_LOW);
     if(lowBound < 0){ lowBound = 0;}
     throttle_raw = lowBound * (THROTTLE_HIGH + 1) / (THROTTLE_HIGH - THROTTLE_LOW);
@@ -135,12 +134,41 @@ void Bldc::readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &curren
 
 
 int readADCxd(u_int16_t gpio){
+  uint8_t ch;
   if(gpio == THROTTLE_PIN){
-    ADC1_HC0 = 1;
+    ch = 0x01;
+    ADC1_HC0 = ch;
     while (!(ADC1_HS & ADC_HS_COCO0)) {
-      yield(); // TODO: what happens if yield-called code uses analogRead()
+      yield(); 
     }
     return ADC1_R0;
+  }
+
+  if(gpio == CURRENT_SENSE_A){
+    ch = 0x83;
+    ADC2_HC0 = ch;
+    while (!(ADC2_HS & ADC_HS_COCO0)) {
+      yield(); 
+    }
+    return ADC2_R0;
+  }
+
+  if(gpio == CURRENT_SENSE_B){
+    ch = 0x84;
+    ADC2_HC0 = ch;
+    while (!(ADC2_HS & ADC_HS_COCO0)) {
+      yield(); 
+    }
+    return ADC2_R0;
+  }
+
+  if(gpio == CURRENT_SENSE_C){
+    ch = 0x81;
+    ADC2_HC0 = ch;
+    while (!(ADC2_HS & ADC_HS_COCO0)) {
+      yield();
+    }
+    return ADC2_R0;
   }
   return 0;
 }
@@ -154,7 +182,6 @@ int readADCxd(u_int16_t gpio){
 
 void Bldc::run(){
   /*1-4000*/
-  uint16_t th;
     setGatePWM(GATE_AH, 3000);
     setGatePWM(GATE_AL, 3000);
 
@@ -163,7 +190,6 @@ void Bldc::run(){
 
     setGatePWM(GATE_CH, 100);
     setGatePWM(GATE_CL, 100);
-    // readThrottle(th);
     int val;
     val = readADCxd(THROTTLE_PIN);
     Serial.println(val);
