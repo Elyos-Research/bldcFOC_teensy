@@ -3,41 +3,76 @@
 
 #include <Arduino.h>
 #include "Pinout.h"
+#include <cstdint>
 
-class Bldc
-{
-private:
-    uint32_t trap_duty;
-    uint8_t hall_state;
-
-    uint8_t current_sense_index;
-    
-    // Configuration
-    void configurePWMs();
-    void configureADCs();
-    // PWM Control
-    void setGatePWM(int gate, int pwm);
-    void setPhaseDuty(uint16_t h_a, uint16_t l_a, uint16_t h_b, uint16_t l_b, uint16_t h_c, uint16_t l_c);
-    // Hall sensors
-    void getHalls(uint8_t &hall);
-    void identifyHalls(uint8_t &current_hall_state);
-    // Read sensors
-    void readThrottle(uint16_t &throttle);
-    void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
-
-    void flexpwmFrequencyCA(IMXRT_FLEXPWM_t*p, unsigned int submodule, uint8_t channel, float freq);
-    void flexpwmWriteCA( IMXRT_FLEXPWM_t *p, unsigned int submodule, uint8_t channel, uint16_t val1);
+class Bldc {
 public:
-    enum ControlType { Trap, Foc };
-    ControlType controlType;
+    enum class ControlType { Trap, Foc }; 
+    
+    // Member variables
+    volatile uint32_t throttleRawVal; // Throttle value
+    volatile uint16_t throttleNormVal; // Throttle value
+    volatile uint8_t hallState;    // Current Hall sensor state
+    volatile bool newCycle;
+    volatile bool newThrottleVal;
 
+    
     Bldc();
     ~Bldc();
-    
-    void driverInit();
-    void run();
-    static void adcISR();
+
+    void driverInit(); // Initialize the driver
+    virtual void run(); // Main loop function
+
+protected:
+    // Phase structure
+    struct Phase {
+        enum class Mode : uint8_t {
+        Complementary = 0,
+        X = 1,
+        ZeroComplement = 2
+        };
+        
+        uint16_t pwmVal;  // PWM value for the high side phase
+        uint8_t highSide; // High-side gate pin
+        uint8_t lowSide;  // Low-side gate pin
+        Mode mode;        // Operating mode
+        uint8_t phaseID;  // A, B, C - 1, 2, 3
+    };
+
+    // Objects
+    ControlType controlType; // Control type (Trap or Foc)
+
+    Phase phaseA; // Phase A configuration
+    Phase phaseB; // Phase B configuration
+    Phase phaseC; // Phase C configuration
+
+    // Configuration
+    void configurePWM();
+    void configureADC();
+
+    // Hall sensors
+    void readHalls(uint8_t &hallState);
+    void identifyHalls(uint8_t &currentHallState);
+
+    // PWM Control
+    void setGatePWM(Phase phase);
+    void setPhaseDuty(uint16_t phaseApwm, uint16_t phaseBpwm, uint16_t phaseCpwm);
+
+    // Sensor readings
+    void normThrottle(uint16_t &throttle);
+    void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
+
+    // PWM utilities
+    void setPwmFrequency(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, float freq);
+    void writePwmValue(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, uint16_t value, Phase::Mode mode);
 
 };
 
-#endif //BLDC_H
+// ADC IRQ trigger
+void triggerADC();
+
+// Debug utilities
+void toggleLed();
+void toggleFlag();
+
+#endif // BLDC_H

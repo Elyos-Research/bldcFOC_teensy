@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include "Bldc.h"
+#include "Trap.h"
 
-Bldc bldc;
+Trap bldc;
 bool irq_flag_state;
 
 void setup(){
