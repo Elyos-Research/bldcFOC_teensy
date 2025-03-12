@@ -208,7 +208,7 @@ void Bldc::setGatePWM(Phase phase){
   }
 }
 
-void Bldc::setPhaseDuty(uint16_t phaseApwm, uint16_t phaseBpwm, uint16_t phaseCpwm){
+void Bldc::setPhaseDuty(int16_t phaseApwm, int16_t phaseBpwm, int16_t phaseCpwm){
     if (phaseApwm > 1){ 
         phaseA.pwmVal = phaseApwm;
         phaseA.mode = Phase::Mode::Complementary;

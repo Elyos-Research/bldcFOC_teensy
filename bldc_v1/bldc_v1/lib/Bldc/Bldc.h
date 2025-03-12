@@ -25,7 +25,7 @@ public:
 
 protected:
     // Phase structure
-    struct Phase {
+    struct Phase {  //< TODO: recibe pwm uinsigned pero debe de ser consigno!
         enum class Mode : uint8_t {
         Complementary = 0,
         X = 1,
@@ -56,7 +56,7 @@ protected:
 
     // PWM Control
     void setGatePWM(Phase phase);
-    void setPhaseDuty(uint16_t phaseApwm, uint16_t phaseBpwm, uint16_t phaseCpwm);
+    void setPhaseDuty(int16_t phaseApwm, int16_t phaseBpwm, int16_t phaseCpwm);
 
     // Sensor readings
     void normThrottle(uint16_t &throttle);

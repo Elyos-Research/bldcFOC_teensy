@@ -20,19 +20,26 @@ void Trap::run()
         throttleNormVal = throttle;
         hallState = hall;
         newThrottleVal = false;
+        Serial.print(hall);
+        Serial.print("    ");
+        Serial.print((int)phaseA.mode);
+        Serial.print((int)phaseB.mode);
+        Serial.println((int)phaseC.mode);
+
     }
 }
 
-void Trap::writeTrap(uint8_t &halls, uint16_t duty){
+void Trap::writeTrap(uint8_t &halls, uint16_t uDuty){
     toggleLed();
     // Bound duty
-    if(duty > 4096){ 
-        duty = 4096;
+    if(uDuty > 4096){ 
+        uDuty = 4096;
     }
-    if(duty < 0){
-        duty = 0;
+    if(uDuty < 0){
+        uDuty = 1;
     }
-    Serial.println(duty);
+    int16_t duty = (int16_t) uDuty;
+    duty = 1;
     switch(halls){
         case 1: // Case 001
             setPhaseDuty(duty, 0, -1);

@@ -40,8 +40,8 @@ constexpr uint8_t kAnalogResolution{12}; // 12-bit ADC
 constexpr uint8_t kAnalogAveraging{8};   // 8x oversampling
 
 // Throttle Configuration
-constexpr uint16_t kThrottleLow{10};     // Minimum throttle value
-constexpr uint16_t kThrottleHigh{4094};  // Maximum throttle value
+constexpr uint16_t kThrottleLow{550};     // Minimum throttle value
+constexpr uint16_t kThrottleHigh{2900};  // Maximum throttle value
 constexpr uint16_t kThrottleResolution{4095}; // Throttle resolution (12-bit)
 
 
