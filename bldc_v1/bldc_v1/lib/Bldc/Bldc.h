@@ -32,7 +32,7 @@ protected:
         ZeroComplement = 2
         };
         
-        uint16_t pwmVal;  // PWM value for the high side phase
+        int16_t pwmVal;  // PWM value for the high side phase
         uint8_t highSide; // High-side gate pin
         uint8_t lowSide;  // Low-side gate pin
         Mode mode;        // Operating mode
@@ -60,11 +60,11 @@ protected:
 
     // Sensor readings
     void normThrottle(uint16_t &throttle);
-    void readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC);
+    void readCurrents(int16_t &currentA, int16_t &currentB, int16_t &currentC);
 
     // PWM utilities
     void setPwmFrequency(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, float freq);
-    void writePwmValue(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, uint16_t value, Phase::Mode mode);
+    void writePwmValue(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, int16_t value, Phase::Mode mode);
 
 };
 

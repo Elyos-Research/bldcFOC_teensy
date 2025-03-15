@@ -195,16 +195,22 @@ void Bldc::setGatePWM(Phase phase){
   {
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, phase.pwmVal, phase.mode);
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, phase.pwmVal, phase.mode);
+    Serial.print("\tA> ");
+    Serial.print(phase.pwmVal);
   }
   if (phase.phaseID == 2)
   {
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, phase.pwmVal, phase.mode);
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, phase.pwmVal, phase.mode);
+    Serial.print(" B> ");
+    Serial.print(phase.pwmVal);
   }
   if (phase.phaseID == 3)
   {
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, phase.pwmVal, phase.mode);
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, phase.pwmVal, phase.mode);
+    Serial.print(" C> ");
+    Serial.println(phase.pwmVal);
   }
 }
 
@@ -258,7 +264,7 @@ void Bldc::normThrottle(uint16_t &throttle) {
     throttle = map(throttleRaw, kThrottleLow, kThrottleHigh, 0, kThrottleResolution);
 }
 
-void Bldc::readCurrents(uint16_t &currentA, uint16_t &currentB, uint16_t &currentC) {
+void Bldc::readCurrents(int16_t &currentA, int16_t &currentB, int16_t &currentC) {
     currentA = analogRead(kCurrentSenseA);
     currentB = analogRead(kCurrentSenseB);
     currentC = analogRead(kCurrentSenseC);
@@ -283,7 +289,7 @@ void Bldc::setPwmFrequency(IMXRT_FLEXPWM_t *p, uint8_t submodule, uint8_t channe
     p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
 }
 
-void Bldc::writePwmValue(IMXRT_FLEXPWM_t *p, uint8_t submodule, uint8_t channel, uint16_t value, Phase::Mode mode) {
+void Bldc::writePwmValue(IMXRT_FLEXPWM_t *p, uint8_t submodule, uint8_t channel, int16_t value, Phase::Mode mode) {
     if (mode == Phase::Mode::Complementary || mode == Phase::Mode::ZeroComplement){
         IMXRT_FLEXPWM2.SM[submodule & 0xF].OCTRL &= ~FLEXPWM_SMOCTRL_POLB; 
     } else{

@@ -17,14 +17,16 @@ void Trap::run()
         uint16_t throttle = static_cast<uint16_t>(throttleRawVal);
         readHalls(hall);
         normThrottle(throttle);
+
+        throttle = 100;
         throttleNormVal = throttle;
         hallState = hall;
         newThrottleVal = false;
-        Serial.print(hall);
-        Serial.print("    ");
-        Serial.print((int)phaseA.mode);
-        Serial.print((int)phaseB.mode);
-        Serial.println((int)phaseC.mode);
+        // Serial.print(hall);
+        // Serial.print("\t");
+        // Serial.print((int)phaseA.mode);
+        // Serial.print((int)phaseB.mode);
+        // Serial.print((int)phaseC.mode);
 
     }
 }
@@ -32,6 +34,9 @@ void Trap::run()
 void Trap::writeTrap(uint8_t &halls, uint16_t uDuty){
     toggleLed();
     // Bound duty
+    // Serial.print("   ");
+    // Serial.print(uDuty);
+    // Serial.print("   ");
     if(uDuty > 4096){ 
         uDuty = 4096;
     }
@@ -39,7 +44,6 @@ void Trap::writeTrap(uint8_t &halls, uint16_t uDuty){
         uDuty = 1;
     }
     int16_t duty = (int16_t) uDuty;
-    duty = 1;
     switch(halls){
         case 1: // Case 001
             setPhaseDuty(duty, 0, -1);
