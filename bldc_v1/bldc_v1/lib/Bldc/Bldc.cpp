@@ -172,22 +172,25 @@ void Bldc::configureADC() {
 }
 
 void Bldc::readHalls(uint8_t &hall) {
-    uint8_t hallCounts[3] = {0};
-
+    uint8_t hallCountsC = 0, hallCountsB = 0, hallCountsA = 0;
+    
     for (uint8_t i = 0; i < kHallOverSample; i++) {
-        hallCounts[0] += digitalRead(kHallAPin);
-        hallCounts[1] += digitalRead(kHallBPin);
-        hallCounts[2] += digitalRead(kHallCPin);
+        hallCountsC += digitalRead(kHallCPin);
+        hallCountsB += digitalRead(kHallBPin);
+        hallCountsA += digitalRead(kHallAPin);
     }
-    hall = (hallCounts[0] > kHallOverSample / 2) << 0 |
-           (hallCounts[1] > kHallOverSample / 2) << 1 |
-           (hallCounts[2] > kHallOverSample / 2) << 2;
+    
+    hall = ((hallCountsC > kHallOverSample / 2) << 2) |
+           ((hallCountsB > kHallOverSample / 2) << 1) |
+           ((hallCountsA > kHallOverSample / 2) << 0);
 }
 
-void Bldc::identifyHalls(uint8_t &currentHallState) {
-    uint8_t aux = (digitalRead(kHallAPin) << 2) | (digitalRead(kHallBPin) << 1) | (digitalRead(kHallCPin));
-    if (aux == 0 || aux == 7) return;  // Discard invalid positions
-    currentHallState = aux;
+
+void Bldc::nextStep(uint8_t &currentHallState) {
+    /** Override this method */
+    #ifdef SERIAL_DEBUG
+        Serial.println("Override nextStep method");
+    #endif
 }
 
 void Bldc::setGatePWM(Phase phase){
@@ -195,28 +198,34 @@ void Bldc::setGatePWM(Phase phase){
   {
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 0) & 3, 1, phase.pwmVal, phase.mode);
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 0) & 3, 2, phase.pwmVal, phase.mode);
-    Serial.print("\tA> ");
-    Serial.print(phase.pwmVal);
+    #ifdef SERIAL_DEBUG
+        Serial.print("\tA> ");
+        Serial.print(phase.pwmVal);
+    #endif
   }
   if (phase.phaseID == 2)
   {
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 2) & 3, 1, phase.pwmVal, phase.mode);
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 2) & 3, 2, phase.pwmVal, phase.mode);
-    Serial.print(" B> ");
-    Serial.print(phase.pwmVal);
+    #ifdef SERIAL_DEBUG
+        Serial.print(" B> ");
+        Serial.print(phase.pwmVal);
+    #endif
   }
   if (phase.phaseID == 3)
   {
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 3) & 3, 1, phase.pwmVal, phase.mode);
     writePwmValue(&IMXRT_FLEXPWM2, M(2, 3) & 3, 2, phase.pwmVal, phase.mode);
-    Serial.print(" C> ");
-    Serial.println(phase.pwmVal);
+    #ifdef SERIAL_DEBUG
+        Serial.print(" C> ");
+        Serial.println(phase.pwmVal);
+    #endif
   }
 }
 
 void Bldc::setPhaseDuty(int16_t phaseApwm, int16_t phaseBpwm, int16_t phaseCpwm){
     if (phaseApwm > 1){ 
-        phaseA.pwmVal = phaseApwm;
+        phaseA.pwmVal = 4096 - phaseApwm;
         phaseA.mode = Phase::Mode::Complementary;
         setGatePWM(phaseA); 
     } else if (phaseApwm == 0){ 
@@ -230,7 +239,7 @@ void Bldc::setPhaseDuty(int16_t phaseApwm, int16_t phaseBpwm, int16_t phaseCpwm)
     }
     
     if (phaseBpwm > 1){ 
-        phaseB.pwmVal = phaseBpwm;
+        phaseB.pwmVal =  4096 - phaseBpwm;
         phaseB.mode = Phase::Mode::Complementary;
         setGatePWM(phaseB); 
     } else if (phaseBpwm == 0){ 
@@ -244,7 +253,7 @@ void Bldc::setPhaseDuty(int16_t phaseApwm, int16_t phaseBpwm, int16_t phaseCpwm)
     }
 
     if (phaseCpwm > 1){ 
-        phaseC.pwmVal = phaseCpwm;
+        phaseC.pwmVal = 4096 - phaseCpwm;
         phaseC.mode = Phase::Mode::Complementary;
         setGatePWM(phaseC); 
     } else if (phaseCpwm == 0){ 

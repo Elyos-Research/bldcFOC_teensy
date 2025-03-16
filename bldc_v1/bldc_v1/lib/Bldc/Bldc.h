@@ -52,7 +52,7 @@ protected:
 
     // Hall sensors
     void readHalls(uint8_t &hallState);
-    void identifyHalls(uint8_t &currentHallState);
+    virtual void nextStep(uint8_t &currentHallState);
 
     // PWM Control
     void setGatePWM(Phase phase);

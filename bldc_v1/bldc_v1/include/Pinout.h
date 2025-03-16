@@ -1,15 +1,15 @@
 #ifndef PINOUT_H
 #define PINOUT_H
 
-#define SERIAL_DEBUG
+//#define SERIAL_DEBUG
 //#define BACKWARDS
 
 #include <cstdint>
 
 // HALL Sensors
 constexpr uint8_t kHallAPin{12}; // Pin for Hall sensor A
-constexpr uint8_t kHallBPin{11}; // Pin for Hall sensor B
-constexpr uint8_t kHallCPin{10}; // Pin for Hall sensor C
+constexpr uint8_t kHallCPin{21}; // Pin for Hall sensor B
+constexpr uint8_t kHallBPin{10}; // Pin for Hall sensor C
 
 // Hall Parameters
 constexpr uint8_t kHallOverSample{8};
