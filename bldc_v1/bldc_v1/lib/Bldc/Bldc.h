@@ -8,14 +8,23 @@
 class Bldc {
 public:
     enum class ControlType { Trap, Foc }; 
+    enum class CurrentSensorChannel { A, B, C };
+
+    // Global state variable to track the current sensor
+    CurrentSensorChannel currentChannel = CurrentSensorChannel::A;
     
     // Member variables
     volatile uint32_t throttleRawVal; // Throttle value
     volatile uint16_t throttleNormVal; // Throttle value
+    volatile uint16_t currentA;
+    volatile uint16_t currentB;
+    volatile uint16_t currentC;
     volatile uint8_t hallState;    // Current Hall sensor state
     volatile bool newCycle;
     volatile bool newThrottleVal;
-
+    volatile uint8_t newCurrentA;
+    volatile uint8_t newCurrentB;
+    volatile uint8_t newCurrentC;
     
     Bldc();
     ~Bldc();
@@ -70,6 +79,9 @@ protected:
 
 // ADC IRQ trigger
 void triggerADC();
+void triggerADC_CurrentA();
+void triggerADC_CurrentB();
+void triggerADC_CurrentC();
 
 // Debug utilities
 void toggleLed();

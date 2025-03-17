@@ -2,7 +2,7 @@
 #define PINOUT_H
 
 //#define SERIAL_DEBUG
-//#define BACKWARDS
+#define BACKWARDS
 
 #include <cstdint>
 

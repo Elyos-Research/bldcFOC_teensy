@@ -28,6 +28,25 @@ void Trap::run()
             Serial.print((int)phaseC.mode);
         #endif
     }
+    if (newCurrentA)
+    {
+        Serial.print("  ");
+        Serial.print(currentA);
+        newCurrentA = false;
+    }
+    if (newCurrentB)
+    {
+        Serial.print("  ");
+        Serial.print(currentB);
+        newCurrentB = false;
+    }
+    if (newCurrentC)
+    {
+        Serial.print("  ");
+        Serial.println(currentC);
+        newCurrentC = false;
+    }
+    
 }
 
 void Trap::nextStep(uint8_t &currentHallState) {

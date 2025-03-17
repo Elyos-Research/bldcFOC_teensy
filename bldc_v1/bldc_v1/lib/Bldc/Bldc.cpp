@@ -6,6 +6,7 @@ void PWM2_CompletedCallback(){
     if (IMXRT_FLEXPWM2.SM[0].STS & 0x1) {  // HF (Half Period Flag)
         IMXRT_FLEXPWM2.SM[0].STS = 0x1;  // Clear HF flag
         triggerADC();
+        triggerADC_CurrentA();
     }
     
     if (IMXRT_FLEXPWM2.SM[0].STS & 0x2) {
@@ -17,14 +18,40 @@ void PWM2_CompletedCallback(){
 }
 
 void ADC1_CompletedConversionCallback(){
-    if (instance) {  // Check if the ADC conversion is complete
-        if (ADC1_HS & ADC_HS_COCO0) {
-            instance->newThrottleVal = true;
-            uint32_t result = ADC1_R0; // Read the ADC result
-            instance->throttleRawVal = result; // Update throttleVal
+    if (ADC1_HS & ADC_HS_COCO0) {
+        instance->newThrottleVal = true;
+        uint32_t result = ADC1_R0; // Read the ADC result
+        instance->throttleRawVal = result; // Update throttleVal
+    }
+    
+}
+
+void ADC2_CompletedConversionCallback(){
+    if (ADC2_HS & ADC_HS_COCO0) {
+        uint32_t result = ADC2_R0;
+        switch(instance->currentChannel) {
+            case Bldc::CurrentSensorChannel::A:
+                instance->newCurrentA = true;
+                instance->currentA = result;
+                instance->currentChannel = Bldc::CurrentSensorChannel::B;
+                triggerADC_CurrentB(); 
+                break;
+            case Bldc::CurrentSensorChannel::B:
+                instance->newCurrentB = true;
+                instance->currentB = result;
+                instance->currentChannel = Bldc::CurrentSensorChannel::C;
+                triggerADC_CurrentC(); 
+                break;
+            case Bldc::CurrentSensorChannel::C:
+                instance->newCurrentC = true;
+                instance->currentC = result;
+                instance->currentChannel = Bldc::CurrentSensorChannel::A;
+                break;
         }
+        ADC2_HS &= ~ADC_HS_COCO0;
     }
 }
+
 
 
 Bldc::Bldc() : controlType(ControlType::Trap), hallState(0), throttleRawVal(0), throttleNormVal(0), newCycle(false) {
@@ -57,6 +84,7 @@ void Bldc::driverInit() {
 
     // Trigger ADC conversion
     triggerADC();
+    triggerADC_CurrentA();
 }
 
 void Bldc::run() {
@@ -169,6 +197,10 @@ void Bldc::configureADC() {
     // Register ADC interrupt
     attachInterruptVector(IRQ_ADC1, ADC1_CompletedConversionCallback);
     NVIC_ENABLE_IRQ(IRQ_ADC1);
+
+    attachInterruptVector(IRQ_ADC2, ADC2_CompletedConversionCallback);
+    NVIC_ENABLE_IRQ(IRQ_ADC2);
+
 }
 
 void Bldc::readHalls(uint8_t &hall) {
@@ -346,11 +378,28 @@ void Bldc::writePwmValue(IMXRT_FLEXPWM_t *p, uint8_t submodule, uint8_t channel,
     p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
 }
 
-
+// Trigger ADC conversion for Throttle on ADC1 channel (HC0)
 void triggerADC() {
     uint8_t ch = 0x01 | (1 << 7); // Set channel and enable interrupt
     ADC1_HC0 = ch;
 }
+
+void triggerADC_CurrentA() {
+    uint8_t ch = 0x03 | (1 << 7);  
+    ADC2_HC0 = ch;
+}
+
+void triggerADC_CurrentB() {
+    uint8_t ch = 0x04 | (1 << 7);  
+    ADC2_HC0 = ch;
+}
+
+// Trigger ADC conversion for Current Sensor C on ADC2 channel (HC2)
+void triggerADC_CurrentC() {
+    uint8_t ch = 0x01 | (1 << 7);  
+    ADC2_HC0 = ch;
+}
+
 
 void toggleLed(){
   digitalWrite(kBuiltInLedPin, !digitalRead(kBuiltInLedPin));
@@ -359,105 +408,4 @@ void toggleLed(){
 void toggleFlag(){
   digitalWrite(kIrqFlagPin, !digitalRead(kIrqFlagPin));
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// int readADCxd(u_int16_t gpio){
-//   uint8_t ch;
-//   if(gpio == kThrottlePin){
-//     ch = 0x01;
-//     ch |= 1 << 7;
-//     ADC1_HC0 = ch;
-//     while (!(ADC1_HS & ADC_HS_COCO0)) {
-//       yield(); 
-//     }
-//     return ADC1_R0;
-//   }
-
-//   if(gpio == kCurrentSenseA){
-//     ch = 0x03; 
-//     ADC2_HC0 = ch;
-//     while (!(ADC2_HS & ADC_HS_COCO0)) {
-//       yield(); 
-//     }
-//     return ADC2_R0;
-//   }
-
-//   if(gpio == kCurrentSenseB){
-//     ch = 0x04;
-//     ADC2_HC0 = ch;
-//     while (!(ADC2_HS & ADC_HS_COCO0)) {
-//       yield(); 
-//     }
-//     return ADC2_R0;
-//   }
-
-//   if(gpio == kCurrentSenseC){
-//     ch = 0x01;
-//     ADC2_HC0 = ch;
-//     while (!(ADC2_HS & ADC_HS_COCO0)) {
-//       yield();
-//     }
-//     return ADC2_R0;
-//   }
-//   return 0;
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
