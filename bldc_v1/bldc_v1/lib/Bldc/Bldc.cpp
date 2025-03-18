@@ -52,6 +52,39 @@ void ADC2_CompletedConversionCallback(){
     }
 }
 
+void GPIO_ChangeEdgeCallback(){
+    unsigned long now = millis();
+    float dt = (now - instance->lastHallChangeTime) / 1000.0;
+    instance->lastHallChangeTime = now;
+    const float MIN_DT = 0.001f; // 1 ms minimum dt
+    if(dt < MIN_DT) {
+        dt = MIN_DT;
+    }
+    float measuredRpm = 60.0f / (TICKS_PER_REV * dt);
+    
+    const float MAX_RPM = 10000.0f;
+    if(measuredRpm > MAX_RPM) {
+        measuredRpm = instance->rpm;
+    }
+    
+    instance->rpmBuffer[instance->rpmBufferIndex] = measuredRpm;
+    instance->rpmBufferIndex = (instance->rpmBufferIndex + 1) % FILTER_SIZE;
+    if(instance->rpmBufferCount < FILTER_SIZE) {
+        instance->rpmBufferCount++;
+    }
+    
+    float sum = 0.0f;
+    for (int i = 0; i < instance->rpmBufferCount; i++) {
+        sum += instance->rpmBuffer[i];
+    }
+    float filteredRpm = sum / instance->rpmBufferCount;
+    
+    instance->rpm = filteredRpm;
+    #ifdef MEASURE_TICKS_PER_REV
+        instance->testRev++;
+        Serial.println(instance->testRev);
+    #endif
+}
 
 
 Bldc::Bldc() : controlType(ControlType::Trap), hallState(0), throttleRawVal(0), throttleNormVal(0), newCycle(false) {
@@ -60,6 +93,12 @@ Bldc::Bldc() : controlType(ControlType::Trap), hallState(0), throttleRawVal(0), 
     phaseA = {0, 0, kGateAH, Phase::Mode::X, 1};
     phaseB = {0, 0, kGateBH, Phase::Mode::X, 2};
     phaseC = {0, 0, kGateCH, Phase::Mode::X, 3};
+    int rpmBufferIndex = 0;
+    int rpmBufferCount = 0;
+    rpm = 0;
+    #ifdef MEASURE_TICKS_PER_REV
+        testRev = 0;
+    #endif
 }
 
 Bldc::~Bldc() {}
@@ -70,6 +109,10 @@ void Bldc::driverInit() {
     pinMode(kHallBPin, INPUT);
     pinMode(kHallCPin, INPUT);
 
+    attachInterrupt(digitalPinToInterrupt(kHallAPin), GPIO_ChangeEdgeCallback, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(kHallBPin), GPIO_ChangeEdgeCallback, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(kHallCPin), GPIO_ChangeEdgeCallback, CHANGE);
+   
     // Initialize debug pins
     pinMode(kBuiltInLedPin, OUTPUT);
     pinMode(kIrqFlagPin, OUTPUT);
@@ -376,6 +419,18 @@ void Bldc::writePwmValue(IMXRT_FLEXPWM_t *p, uint8_t submodule, uint8_t channel,
             break;
     }
     p->MCTRL |= FLEXPWM_MCTRL_LDOK(mask);
+}
+
+void Bldc::validateRpm(){
+    unsigned long now = millis();
+    if (now - lastHallChangeTime > RPM_TIMEOUT_MS) {
+        for (int i = 0; i < FILTER_SIZE; i++) {
+            rpmBuffer[i] = 0.0f;
+        }
+        rpmBufferCount = 0;
+        rpmBufferIndex = 0;
+        rpm = 0.0f;
+    }
 }
 
 // Trigger ADC conversion for Throttle on ADC1 channel (HC0)

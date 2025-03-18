@@ -10,6 +10,8 @@ void Trap::run()
         uint8_t hall = hallState;
         uint16_t throttle = throttleNormVal;
         writeTrap(hall, throttle);
+        validateRpm();
+        Serial.println(rpm, 6);
         newCycle = false;
     }
     if(newThrottleVal){
@@ -31,7 +33,7 @@ void Trap::run()
     #ifdef SERIAL_DEBUG_CURRENTS
         if (newCurrentA)
         {
-            Serial.print("\n");
+            Serial.print("\t");
             Serial.print(currentA);
             newCurrentA = false;
         }
@@ -46,6 +48,7 @@ void Trap::run()
             Serial.print("\t");
             Serial.println(currentC);
             newCurrentC = false;
+            Serial.print("\n");
         }
     #endif
     

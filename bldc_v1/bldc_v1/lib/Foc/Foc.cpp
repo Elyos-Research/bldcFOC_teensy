@@ -1,113 +1,206 @@
-// #include "Foc.h"
-// #include <Arduino.h>
-// #include <math.h>
+#include "Foc.h"
 
-// #define TWO_PI 6.28318530718f
 
-// Foc::Foc() : id_ref(0.0f), iq_ref(0.0f), id(0.0f), iq(0.0f), angle(0.0f),
-//              kp_d(0.1f), ki_d(0.01f), kp_q(0.1f), ki_q(0.01f),
-//              integral_d(0.0f), integral_q(0.0f)
-// {
-//     // Set control type to FOC so that any base class behavior can differ if needed
-//     controlType = ControlType::Foc;
-// }
-
-// Foc::~Foc() {}
-
-// void Foc::run() {
-//     // Update FOC control once per PWM cycle
-//     if (newCycle) {
-//         // Read hall sensors to get a crude estimate of rotor position.
-//         // In a full FOC implementation, you might use an encoder or observer.
-//         uint8_t hall = 0;
-//         readHalls(hall);
-//         // For simplicity, map the hall state (0 to 7) into an electrical angle.
-//         // Adjust this mapping as needed.
-//         angle = (float)hall / 6.0f * TWO_PI;
-
-//         // Read throttle and update iq reference.
-//         // Here we assume throttleNormVal (0–4096) maps directly to a voltage reference.
-//         uint16_t throttle = throttleNormVal;
-//         iq_ref = (float)throttle / 4096.0f;  // Scale throttle to [0,1] range
-//         // In many FOC strategies id_ref is set to zero (maximizing torque per amp).
-//         id_ref = 0.0f;
-
-//         // Read the phase currents.
-//         // Here we assume currentA, currentB and currentC are updated by your ADC callbacks.
-//         float ia = (float)currentA;  // Conversion factors may be needed in a real system.
-//         float ib = (float)currentB;
-//         float ic = (float)currentC;
-        
-//         // Perform Clarke transform to get i_alpha and i_beta.
-//         float i_alpha, i_beta;
-//         clarkeTransform(ia, ib, ic, i_alpha, i_beta);
-        
-//         // Perform Park transform to get d– and q–axis currents.
-//         parkTransform(i_alpha, i_beta, angle, id, iq);
-
-//         // Run PI current controllers for both axes.
-//         float vd, vq;
-//         currentControl(id, iq, id_ref, iq_ref, vd, vq);
-
-//         // Convert the voltage references back to the stationary frame.
-//         float v_alpha, v_beta;
-//         inverseParkTransform(vd, vq, angle, v_alpha, v_beta);
-
-//         // Convert these voltage references into PWM duty cycles.
-//         // This example uses a placeholder mapping.
-//         int16_t dutyA = (int16_t)((v_alpha + 1.0f) * 2048);  // Adjust scaling as required
-//         int16_t dutyB = (int16_t)((v_beta  + 1.0f) * 2048);
-//         // For phase C, one common method is to use the zero–sequence component.
-//         int16_t dutyC = (int16_t)((-v_alpha - v_beta + 1.0f) * 2048);
-        
-//         // Update the PWM outputs.
-//         setPhaseDuty(dutyA, dutyB, dutyC);
-        
-//         newCycle = false;
-//     }
+Foc::Foc() {
+    /*Phases values*/
+    phases.pwmA = 0;
+    phases.pwmB = 0;
+    phases.pwmC = 0;
     
-//     // Update throttle if a new throttle value has been acquired.
-//     if (newThrottleVal) {
-//         uint16_t throttle;
-//         throttle = (uint16_t)throttleRawVal;
-//         normThrottle(throttle);
-//         throttleNormVal = throttle;
-//         newThrottleVal = false;
-//     }
-// }
-
-// // --- Transform and Control Functions ---
-
-// // Clarke Transform: convert three-phase currents to two orthogonal components.
-// // Assumes balanced currents where ia + ib + ic = 0.
-// void Foc::clarkeTransform(float ia, float ib, float ic, float &i_alpha, float &i_beta) {
-//     // One common form:
-//     i_alpha = ia;
-//     i_beta = (1.0f / sqrt(3.0f)) * (ia + 2.0f * ib);
-// }
-
-// // Park Transform: rotate the αβ frame into the dq frame using the rotor angle.
-// void Foc::parkTransform(float i_alpha, float i_beta, float angle, float &id, float &iq) {
-//     id = i_alpha * cos(angle) + i_beta * sin(angle);
-//     iq = -i_alpha * sin(angle) + i_beta * cos(angle);
-// }
-
-// // Inverse Park Transform: convert dq voltage commands back into the αβ frame.
-// void Foc::inverseParkTransform(float vd, float vq, float angle, float &v_alpha, float &v_beta) {
-//     v_alpha = vd * cos(angle) - vq * sin(angle);
-//     v_beta  = vd * sin(angle) + vq * cos(angle);
-// }
-
-// // Simple PI current control for d- and q–axis loops.
-// void Foc::currentControl(float id_measured, float iq_measured, float id_ref, float iq_ref, float &vd, float &vq) {
-//     float error_d = id_ref - id_measured;
-//     float error_q = iq_ref - iq_measured;
+    /*Control id currents*/
+    pid_d.Kp = 10.0; 
+    pid_d.Ki = 5.0; 
+    pid_d.Kd = 0.0;
     
-//     // Integrate the errors.
-//     integral_d += error_d;
-//     integral_q += error_q;
+    pid_d.prevError = 0.0; 
+    pid_d.integral = 0.0;
     
-//     // PI control output.
-//     vd = kp_d * error_d + ki_d * integral_d;
-//     vq = kp_q * error_q + ki_q * integral_q;
-// }
+    /*Control iq currents*/
+    pid_q.Kp = 10.0; 
+    pid_q.Ki = 5.0; 
+    pid_q.Kd = 0.0;
+    
+    pid_q.prevError = 0.0; 
+    pid_q.integral = 0.0;
+
+    /*dt*/
+    lastRunTime = millis();
+}
+
+Foc::~Foc() {}
+
+
+Foc::ClarkeTransform_t Foc::clarkeTransform(float a, float b, float c) {
+    ClarkeTransform_t ct;
+    ct.alpha = (2.0f/3.0f) * (a - 0.5f*b - 0.5f*c);
+    ct.beta  = (2.0f/3.0f) * ((sqrt(3.0f)/2.0f)*b - (sqrt(3.0f)/2.0f)*c);
+    return ct;
+}
+
+Foc::ParkTransform_t Foc::parkTransform(float alph, float bet, float theta) {
+    ParkTransform_t pt;
+    SinCosCalc_t result = trigCalc(theta, 16);
+
+    float cosTheta = cos(theta);
+    float sinTheta = sin(theta);
+    pt.d = alph*result.cos + bet*result.sin;
+    pt.q = -alph*result.sin + bet*result.cos;
+    return pt;
+}
+
+Foc::InversePark_t Foc::inverseParkTransform(float d, float q, float theta) {
+    InversePark_t ip;
+    SinCosCalc_t result = trigCalc(theta, 16);
+    ip.iAlpha = d*result.cos - q*result.sin; 
+    ip.iBeta =  d*result.sin + q*result.cos;
+    return ip;
+}
+
+Foc::InverseClarke_t Foc::inverseClarkeTransform(float alpha, float beta) {
+    InverseClarke_t ic;
+    ic.fdbackA = alpha;
+    ic.fdbackB = -0.5f * alpha + (sqrt(3.0f)/2.0f)*beta;
+    ic.fdbackC = -0.5f * alpha - (sqrt(3.0f)/2.0f)*beta;
+    return ic;
+}
+
+Foc::SinCosCalc_t Foc::trigCalc(double angle, int n){
+    SinCosCalc_t scc;
+    double coscalc, sincalc;
+    cordic(angle, n, &coscalc, &sincalc);
+    scc.cos = coscalc;
+    scc.sin = sincalc; 
+    return scc;
+}
+
+void Foc::cordic(double angle, int n, double *cosval, double *sinval){
+    int i, ix, sigma;
+    double kn, x, y, atn, t, theta = 0.0, pow2 = 1.0;
+    int newsgn = (int)floor(angle / (2.0 * M_PI)) % 2 == 1 ? 1 : -1;
+    
+
+    if (angle < -M_PI/2.0 || angle > M_PI/2.0){
+        if(angle < 0){
+            cordic(angle+M_PI, n, &x, &y);
+            
+        } else {
+            cordic(angle-M_PI, n, &x, &y);
+        }
+        *cosval = x * newsgn;
+        *sinval = y * newsgn;
+        return;
+    }
+    ix = n - 1;
+    if(ix > 23) ix = 23;
+    kn = kvalues[ix];
+    x = 1;
+    y =0 ;
+    
+    for (i = 0; i < n; ++i) {
+        atn = angles[i];
+        sigma = (theta < angle) ? 1 : -1;
+        theta += sigma * atn;
+        t = x;
+        x -= sigma * y * pow2;
+        y += sigma * t * pow2;
+        pow2 /= 2.0;
+    }
+    *cosval = x * kn;
+    *sinval = y * kn;    
+}
+
+double Foc::computePID(PIDController_t &pid, double setpoint, double measurement, double dt) {
+    double error = setpoint - measurement;
+    pid.integral += error * dt;
+    double derivative = (error - pid.prevError) / dt;
+    double output = pid.Kp * error + pid.Ki * pid.integral + pid.Kd * derivative;
+    pid.prevError = error;
+    return output;
+}
+
+float Foc::getRotorAngle() {
+    unsigned long timeNow = millis();
+    float seconds = timeNow / 1000.0;
+    float frequency = 2.61;
+    float angle = fmod(2.0 * M_PI * frequency * seconds, 2.0 * M_PI);
+    return angle;
+}
+
+float Foc::measureVelocity(float dt) {
+    float currentAngle = getRotorAngle();
+    float deltaAngle = currentAngle - lastRotorAngle;
+    if (deltaAngle > M_PI) {
+        deltaAngle -= 2.0 * M_PI;
+    } else if (deltaAngle < -M_PI) {
+        deltaAngle += 2.0 * M_PI;
+    }
+    lastRotorAngle = currentAngle;
+    return deltaAngle / dt;
+}
+
+void Foc::run() {
+    if (newThrottleVal) {
+        uint16_t throttle;
+        normThrottle(throttle);
+        throttleNormVal = throttle;
+        newThrottleVal = false;
+    }
+    
+    if (newCycle) {
+        //setPhaseDuty(phases.pwmA, phases.pwmB, phases.pwmC);        
+        validateRpm();
+        Serial.println(rpm, 6);
+        newCycle = false;
+    }
+    if (newCurrentC)
+    {
+        unsigned long now = millis();
+        float dt = (now - lastRunTime) / 1000.0;
+        lastRunTime = now;
+        Serial.println(dt,7);
+
+        float rotorVelocity = measureVelocity(dt);
+
+        const double MAX_VELOCITY = 31.16;
+        double desiredVelocity = ((double)throttleNormVal / 4096.0) * MAX_VELOCITY;
+        
+        
+        int16_t curA = currentA;
+        int16_t curB = currentB; 
+        int16_t curC = currentC;
+        readCurrents(curA, curB, curC);
+        
+        float a = (float)curA;
+        float b = (float)curB;
+        float c = (float)curC;
+        
+        /*Estimate theta*/
+        float theta = getRotorAngle();    
+
+        ClarkeTransform_t ct = clarkeTransform(a, b, c);        
+        ParkTransform_t pt = parkTransform(ct.alpha, ct.beta, theta);
+        
+        double setpoint_d = 0.0;
+        double setpoint_q = 0;
+
+        double iq_ref = computePID(pid_vel, desiredVelocity, rotorVelocity, dt);
+        
+        double v_d = computePID(pid_d, setpoint_d, pt.d, dt);
+        double v_q = computePID(pid_q, setpoint_q, pt.q, dt);
+        
+        InversePark_t ip = inverseParkTransform(v_d, v_q, theta);
+        InverseClarke_t ic = inverseClarkeTransform(ip.iAlpha, ip.iBeta);
+        
+        // Map the commanded voltages to PWM duty cycles.
+        const float Vmax = 20.0;
+        int16_t dutyA = (int16_t)(constrain((ic.fdbackA + Vmax) / (2.0 * Vmax) * 4096.0, 0, 4096));
+        int16_t dutyB = (int16_t)(constrain((ic.fdbackB + Vmax) / (2.0 * Vmax) * 4096.0, 0, 4096));
+        int16_t dutyC = (int16_t)(constrain((ic.fdbackC + Vmax) / (2.0 * Vmax) * 4096.0, 0, 4096));
+
+        phases.pwmA = dutyA;
+        phases.pwmA = dutyB;        
+        phases.pwmA = dutyC;        
+
+        newCurrentC = false;
+    }
+}

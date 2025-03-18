@@ -1,8 +1,14 @@
 #include <Arduino.h>
 #include "Bldc.h"
 #include "Trap.h"
+#include "Foc.h"
 
-Trap bldc;
+#ifdef FOC_CONTROL
+  Foc bldc;
+#else
+  Trap bldc;
+#endif
+
 bool irq_flag_state;
 
 void setup(){

@@ -1,9 +1,14 @@
 #ifndef PINOUT_H
 #define PINOUT_H
 
-//#define SERIAL_DEBUG
-#define SERIAL_DEBUG_CURRENTS
-//#define BACKWARDS
+#define FOC_CONTROL
+// #define SERIAL_DEBUG
+// #define SERIAL_DEBUG_CURRENTS
+// #define BACKWARDS
+
+// #define MEASURE_TICKS_PER_REV
+#define TICKS_PER_REV (float)281
+#define FILTER_SIZE 30  
 
 #include <cstdint>
 

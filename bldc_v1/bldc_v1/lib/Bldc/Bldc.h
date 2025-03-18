@@ -7,6 +7,15 @@
 
 class Bldc {
 public:
+    #ifdef MEASURE_TICKS_PER_REV
+        int testRev;
+    #endif
+
+    float rpmBuffer[FILTER_SIZE] = {0};
+    int rpmBufferIndex;
+    int rpmBufferCount;
+    unsigned long lastHallChangeTime;
+    const unsigned long RPM_TIMEOUT_MS = 50;
     enum class ControlType { Trap, Foc }; 
     enum class CurrentSensorChannel { A, B, C };
 
@@ -19,6 +28,7 @@ public:
     volatile uint16_t currentA;
     volatile uint16_t currentB;
     volatile uint16_t currentC;
+    volatile float rpm;
     volatile uint8_t hallState;    // Current Hall sensor state
     volatile bool newCycle;
     volatile bool newThrottleVal;
@@ -75,6 +85,7 @@ protected:
     void setPwmFrequency(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, float freq);
     void writePwmValue(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, int16_t value, Phase::Mode mode);
 
+    void validateRpm();
 };
 
 // ADC IRQ trigger
