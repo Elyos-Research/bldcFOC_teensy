@@ -1,14 +1,17 @@
 #ifndef PINOUT_H
 #define PINOUT_H
 
-#define FOC_CONTROL
+// #define FOC_CONTROL
 // #define SERIAL_DEBUG
 // #define SERIAL_DEBUG_CURRENTS
-// #define BACKWARDS
+#define BACKWARDS
 
-// #define MEASURE_TICKS_PER_REV
-#define TICKS_PER_REV (float)281
-#define FILTER_SIZE 30  
+//#define MEASURE_TICKS_PER_REV
+
+//#define TICKS_PER_REV (float)281  //< Motor Hub
+#define TICKS_PER_REV (float)134 //< Motor Directo
+
+#define FILTER_SIZE 5  
 
 #include <cstdint>
 

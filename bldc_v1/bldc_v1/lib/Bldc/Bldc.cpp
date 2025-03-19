@@ -53,19 +53,25 @@ void ADC2_CompletedConversionCallback(){
 }
 
 void GPIO_ChangeEdgeCallback(){
-    unsigned long now = millis();
-    float dt = (now - instance->lastHallChangeTime) / 1000.0;
+    unsigned long now = micros();
+    float dt = (now - instance->lastHallChangeTime) / 1000000.0f;
     instance->lastHallChangeTime = now;
-    const float MIN_DT = 0.001f; // 1 ms minimum dt
+    const float MIN_DT = 0.00001f; // 1 us minimum dt
     if(dt < MIN_DT) {
         dt = MIN_DT;
     }
-    float measuredRpm = 60.0f / (TICKS_PER_REV * dt);
+    float measuredRpm = 1.0f / (TICKS_PER_REV * dt);
     
     const float MAX_RPM = 10000.0f;
+    // If the new measured value is more than, say, 5 times the current rpm (and current rpm isn’t near zero), ignore it.
+    if (instance->rpm > 0.001f && measuredRpm > instance->rpm * 30.0f) {
+        measuredRpm = instance->rpm;
+    }
+
     if(measuredRpm > MAX_RPM) {
         measuredRpm = instance->rpm;
     }
+    
     
     instance->rpmBuffer[instance->rpmBufferIndex] = measuredRpm;
     instance->rpmBufferIndex = (instance->rpmBufferIndex + 1) % FILTER_SIZE;
@@ -80,6 +86,16 @@ void GPIO_ChangeEdgeCallback(){
     float filteredRpm = sum / instance->rpmBufferCount;
     
     instance->rpm = filteredRpm;
+
+    uint8_t newHall;
+    instance->readHalls(newHall);
+    
+    // If the hall state has changed, update the instance's hall state and flag.
+    if(newHall != instance->hallState) {
+        instance->hallState = newHall;
+        instance->newHallUpdate = true;
+    }
+
     #ifdef MEASURE_TICKS_PER_REV
         instance->testRev++;
         Serial.println(instance->testRev);
@@ -422,8 +438,8 @@ void Bldc::writePwmValue(IMXRT_FLEXPWM_t *p, uint8_t submodule, uint8_t channel,
 }
 
 void Bldc::validateRpm(){
-    unsigned long now = millis();
-    if (now - lastHallChangeTime > RPM_TIMEOUT_MS) {
+    unsigned long now = micros();
+    if (now - lastHallChangeTime > RPM_TIMEOUT_US) {
         for (int i = 0; i < FILTER_SIZE; i++) {
             rpmBuffer[i] = 0.0f;
         }
@@ -431,6 +447,51 @@ void Bldc::validateRpm(){
         rpmBufferIndex = 0;
         rpm = 0.0f;
     }
+}
+
+
+float Bldc::hallToAngle(uint8_t hall) {
+    // Map hall sensor reading (in CBA order) to rotor angle (in radians)
+    switch(hall) {
+        case 1:  // 001
+            return 0.0f;
+        case 3:  // 011
+            return M_PI / 3.0f; // 60° in radians
+        case 2:  // 010
+            return 2.0f * M_PI / 3.0f; // 120°
+        case 6:  // 110
+            return M_PI; // 180°
+        case 4:  // 100
+            return 4.0f * M_PI / 3.0f; // 240°
+        case 5:  // 101
+            return 5.0f * M_PI / 3.0f; // 300°
+        default:
+            return 0.0f;
+    }
+}
+
+
+
+float Bldc::estimatePosition() {   
+    unsigned long now = micros();
+    // Compute time delta in seconds since the last position update.
+    float dt = (now - lastPosUpdateTime) / 1000000.0f;
+    lastPosUpdateTime = now; 
+    if(newHallUpdate) {
+         rotorPos = hallToAngle(hallState);
+         newHallUpdate = false;
+    } else {
+         float velocity_rad_sec = rpm;
+         rotorPos += velocity_rad_sec * dt;
+    }
+    
+    // Wrap rotorPos between 0 and 2π.
+    rotorPos = fmod(rotorPos, 2.0f * M_PI);
+    if (rotorPos < 0) {
+         rotorPos += 2.0f * M_PI;
+    }
+    
+    return rotorPos;
 }
 
 // Trigger ADC conversion for Throttle on ADC1 channel (HC0)

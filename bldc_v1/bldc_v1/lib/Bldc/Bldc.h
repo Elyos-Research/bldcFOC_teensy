@@ -11,36 +11,52 @@ public:
         int testRev;
     #endif
 
-    float rpmBuffer[FILTER_SIZE] = {0};
-    int rpmBufferIndex;
-    int rpmBufferCount;
-    unsigned long lastHallChangeTime;
-    const unsigned long RPM_TIMEOUT_MS = 50;
+
+    // RPM measures
+    const unsigned long RPM_TIMEOUT_US = 50000;
+    volatile float rpmBuffer[FILTER_SIZE] = {0};
+    volatile int rpmBufferIndex;
+    volatile int rpmBufferCount;
+    volatile unsigned long lastHallChangeTime;
+    volatile float rpm;
+
+    // Position measures
+    volatile bool newHallUpdate;   
+    volatile unsigned long lastPosUpdateTime; 
+    volatile float rotorPos; 
+    volatile uint8_t hallState;    // Current Hall sensor state
+
     enum class ControlType { Trap, Foc }; 
     enum class CurrentSensorChannel { A, B, C };
 
-    // Global state variable to track the current sensor
-    CurrentSensorChannel currentChannel = CurrentSensorChannel::A;
     
     // Member variables
     volatile uint32_t throttleRawVal; // Throttle value
     volatile uint16_t throttleNormVal; // Throttle value
+
+    // Global state variable to track the current sensor
+    CurrentSensorChannel currentChannel = CurrentSensorChannel::A;
+    
+    // Currents measures
     volatile uint16_t currentA;
     volatile uint16_t currentB;
     volatile uint16_t currentC;
-    volatile float rpm;
-    volatile uint8_t hallState;    // Current Hall sensor state
-    volatile bool newCycle;
-    volatile bool newThrottleVal;
     volatile uint8_t newCurrentA;
     volatile uint8_t newCurrentB;
     volatile uint8_t newCurrentC;
+    
+    // Throttle
+    volatile bool newThrottleVal;
+
+    // PWM
+    volatile bool newCycle;
     
     Bldc();
     ~Bldc();
 
     void driverInit(); // Initialize the driver
     virtual void run(); // Main loop function
+    void readHalls(uint8_t &hallState);
 
 protected:
     // Phase structure
@@ -70,7 +86,6 @@ protected:
     void configureADC();
 
     // Hall sensors
-    void readHalls(uint8_t &hallState);
     virtual void nextStep(uint8_t &currentHallState);
 
     // PWM Control
@@ -86,6 +101,8 @@ protected:
     void writePwmValue(IMXRT_FLEXPWM_t *pwmModule, uint8_t submodule, uint8_t channel, int16_t value, Phase::Mode mode);
 
     void validateRpm();
+    float estimatePosition();
+    float hallToAngle(uint8_t hall);
 };
 
 // ADC IRQ trigger

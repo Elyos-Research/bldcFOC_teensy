@@ -203,4 +203,5 @@ void Foc::run() {
 
         newCurrentC = false;
     }
+    toggleLed();
 }

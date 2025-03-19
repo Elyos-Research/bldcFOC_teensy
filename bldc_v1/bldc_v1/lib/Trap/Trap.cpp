@@ -11,7 +11,12 @@ void Trap::run()
         uint16_t throttle = throttleNormVal;
         writeTrap(hall, throttle);
         validateRpm();
-        Serial.println(rpm, 6);
+        estimatePosition();
+        Serial.print("v: ");
+        Serial.print(rpm, 6);
+        Serial.print("\t");
+        Serial.print("p: ");
+        Serial.println(rotorPos, 6);
         newCycle = false;
     }
     if(newThrottleVal){
