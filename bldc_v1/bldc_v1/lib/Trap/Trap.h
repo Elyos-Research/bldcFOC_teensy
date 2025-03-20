@@ -6,6 +6,7 @@
 class Trap : public Bldc
 {
 public:
+    int vel_ref;
     Trap();
     ~Trap();
     void run() override;

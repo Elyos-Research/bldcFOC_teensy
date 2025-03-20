@@ -40,9 +40,6 @@ Foc::ClarkeTransform_t Foc::clarkeTransform(float a, float b, float c) {
 Foc::ParkTransform_t Foc::parkTransform(float alph, float bet, float theta) {
     ParkTransform_t pt;
     SinCosCalc_t result = trigCalc(theta, 16);
-
-    float cosTheta = cos(theta);
-    float sinTheta = sin(theta);
     pt.d = alph*result.cos + bet*result.sin;
     pt.q = -alph*result.sin + bet*result.cos;
     return pt;
@@ -107,15 +104,6 @@ void Foc::cordic(double angle, int n, double *cosval, double *sinval){
     }
     *cosval = x * kn;
     *sinval = y * kn;    
-}
-
-double Foc::computePID(PIDController_t &pid, double setpoint, double measurement, double dt) {
-    double error = setpoint - measurement;
-    pid.integral += error * dt;
-    double derivative = (error - pid.prevError) / dt;
-    double output = pid.Kp * error + pid.Ki * pid.integral + pid.Kd * derivative;
-    pid.prevError = error;
-    return output;
 }
 
 float Foc::getRotorAngle() {

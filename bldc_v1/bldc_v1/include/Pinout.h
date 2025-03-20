@@ -3,8 +3,8 @@
 
 // #define FOC_CONTROL
 // #define SERIAL_DEBUG
-// #define SERIAL_DEBUG_CURRENTS
-#define BACKWARDS
+#define SERIAL_DEBUG_CURRENTS
+// #define BACKWARDS
 
 //#define MEASURE_TICKS_PER_REV
 

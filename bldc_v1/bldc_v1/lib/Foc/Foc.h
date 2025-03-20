@@ -65,14 +65,6 @@ public:
         double fdbackC;
     } InverseClarke_t;
 
-    typedef struct {
-        double Kp;        // Proportional gain
-        double Ki;        // Integral gain
-        double Kd;        // Derivative gain
-        double prevError; // Previous error value
-        double integral;  // Integral of error
-    } PIDController_t;
-
     Foc();
     ~Foc();
     void run() override;
@@ -81,7 +73,6 @@ private:
     Phases_t phases;
     PIDController_t pid_d;
     PIDController_t pid_q;
-    PIDController_t pid_vel;
     
     float lastRotorAngle;
     unsigned long lastRunTime;
@@ -94,7 +85,6 @@ private:
     SinCosCalc_t trigCalc(double angle, int n);
 
     void cordic(double angle, int n, double *cosval, double *sinval);
-    double computePID(PIDController_t &pid, double setpoint, double measurement, double dt);
     float getRotorAngle();
     float measureVelocity(float dt);
 };

@@ -31,22 +31,28 @@ void ADC2_CompletedConversionCallback(){
         uint32_t result = ADC2_R0;
         switch(instance->currentChannel) {
             case Bldc::CurrentSensorChannel::A:
+            {
                 instance->newCurrentA = true;
                 instance->currentA = result;
                 instance->currentChannel = Bldc::CurrentSensorChannel::B;
                 triggerADC_CurrentB(); 
                 break;
+            }
             case Bldc::CurrentSensorChannel::B:
+            {
                 instance->newCurrentB = true;
                 instance->currentB = result;
                 instance->currentChannel = Bldc::CurrentSensorChannel::C;
                 triggerADC_CurrentC(); 
                 break;
+            }
             case Bldc::CurrentSensorChannel::C:
+            {
                 instance->newCurrentC = true;
                 instance->currentC = result;
                 instance->currentChannel = Bldc::CurrentSensorChannel::A;
                 break;
+            } 
         }
         ADC2_HS &= ~ADC_HS_COCO0;
     }
@@ -470,8 +476,6 @@ float Bldc::hallToAngle(uint8_t hall) {
     }
 }
 
-
-
 float Bldc::estimatePosition() {   
     unsigned long now = micros();
     // Compute time delta in seconds since the last position update.
@@ -492,6 +496,15 @@ float Bldc::estimatePosition() {
     }
     
     return rotorPos;
+}
+
+double Bldc::computePID(PIDController_t &pid, double setpoint, double measurement, double dt) {
+    double error = setpoint - measurement;
+    pid.integral += error * dt;
+    double derivative = (error - pid.prevError) / dt;
+    double output = pid.Kp * error + pid.Ki * pid.integral + pid.Kd * derivative;
+    pid.prevError = error;
+    return output;
 }
 
 // Trigger ADC conversion for Throttle on ADC1 channel (HC0)

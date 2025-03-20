@@ -29,6 +29,8 @@ public:
     enum class ControlType { Trap, Foc }; 
     enum class CurrentSensorChannel { A, B, C };
 
+    // Control
+    volatile unsigned long lastVelPosCalc;
     
     // Member variables
     volatile uint32_t throttleRawVal; // Throttle value
@@ -57,6 +59,18 @@ public:
     void driverInit(); // Initialize the driver
     virtual void run(); // Main loop function
     void readHalls(uint8_t &hallState);
+
+    typedef struct {
+        double Kp;        // Proportional gain
+        double Ki;        // Integral gain
+        double Kd;        // Derivative gain
+        double prevError; // Previous error value
+        double integral;  // Integral of error
+    } PIDController_t;
+    
+    PIDController_t pid_vel;
+
+    double computePID(PIDController_t &pid, double setpoint, double measurement, double dt);
 
 protected:
     // Phase structure

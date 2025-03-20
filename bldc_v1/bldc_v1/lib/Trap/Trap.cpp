@@ -1,6 +1,14 @@
 #include "Trap.h"
 
-Trap::Trap() {}
+Trap::Trap() {
+    vel_ref = 1;
+    pid_vel.Kp = 2200.0; 
+    pid_vel.Ki = 160.0; 
+    pid_vel.Kd = 0.0;
+    
+    pid_vel.prevError = 0.0; 
+    pid_vel.integral = 0.0;
+}
 
 Trap::~Trap() {}
 
@@ -12,11 +20,11 @@ void Trap::run()
         writeTrap(hall, throttle);
         validateRpm();
         estimatePosition();
-        Serial.print("v: ");
-        Serial.print(rpm, 6);
-        Serial.print("\t");
-        Serial.print("p: ");
-        Serial.println(rotorPos, 6);
+        // Serial.print("v: ");
+        // Serial.println(rpm, 6);
+        // Serial.print("\t");
+        // Serial.print("p: ");
+        // Serial.println(rotorPos, 6);
         newCycle = false;
     }
     if(newThrottleVal){
@@ -26,6 +34,24 @@ void Trap::run()
         normThrottle(throttle);
         throttleNormVal = throttle;
         hallState = hall;
+
+        /*Test rpm init */
+        PIDController_t velControl = pid_vel;
+        unsigned long now = micros();
+        float dt = (now - lastVelPosCalc) / 1000000.0f;
+        lastVelPosCalc = now;
+        double resPidVel;
+        resPidVel = computePID(velControl, vel_ref, (double)rpm, (double)dt);
+        if(resPidVel < 0){
+            resPidVel = 0;
+        }
+        pid_vel = velControl;
+        // Serial.print(resPidVel);
+        // Serial.print("\t");
+        // throttleNormVal = resPidVel;
+
+        /*Test rpm end*/
+
         newThrottleVal = false;
         #ifdef SERIAL_DEBUG
             Serial.print(hall);
