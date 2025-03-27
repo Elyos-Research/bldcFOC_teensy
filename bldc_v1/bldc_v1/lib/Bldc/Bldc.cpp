@@ -66,8 +66,11 @@ void GPIO_ChangeEdgeCallback(){
     if(dt < MIN_DT) {
         dt = MIN_DT;
     }
-    float measuredRpm = 1.0f / (TICKS_PER_REV * dt);
-    
+    #ifdef RPM
+        float measuredRpm = 60.0f / (TICKS_PER_REV * dt);
+    #else
+        float measuredRpm = 1.0f / (TICKS_PER_REV * dt);
+    #endif    
     const float MAX_RPM = 10000.0f;
     // If the new measured value is more than, say, 5 times the current rpm (and current rpm isn’t near zero), ignore it.
     if (instance->rpm > 0.001f && measuredRpm > instance->rpm * 30.0f) {

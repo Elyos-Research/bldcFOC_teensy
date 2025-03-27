@@ -2,16 +2,22 @@
 #define PINOUT_H
 
 // #define FOC_CONTROL
-// #define SERIAL_DEBUG
-#define SERIAL_DEBUG_CURRENTS
-// #define BACKWARDS
+ #define SERIAL_DEBUG
+//#define SERIAL_DEBUG_CURRENTS
+// #define CSV_FORMAT_CURRENTS
 
-//#define MEASURE_TICKS_PER_REV
+#define BACKWARDS
 
-//#define TICKS_PER_REV (float)281  //< Motor Hub
-#define TICKS_PER_REV (float)134 //< Motor Directo
+// #define MEASURE_TICKS_PER_REV
+
+// #define TICKS_PER_REV (float)281  //< Motor Hub
+// #define TICKS_PER_REV (float)134 //< Motor Directo
+// #define TICKS_PER_REV (float) 94 //< Motor Directo relacion 3
+
+#define TICKS_PER_REV (float)31 //< Motor Directo Raw
 
 #define FILTER_SIZE 5  
+//#define RPM
 
 #include <cstdint>
 

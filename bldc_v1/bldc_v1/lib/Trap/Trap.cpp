@@ -62,6 +62,26 @@ void Trap::run()
         #endif
     }
     #ifdef SERIAL_DEBUG_CURRENTS
+        #ifdef CSV_FORMAT_CURRENTS
+        if (newCurrentA)
+        {
+            Serial.print(currentA);
+            newCurrentA = false;
+        }
+        if (newCurrentB)
+        {
+            Serial.print(",");
+            Serial.print(currentB);
+            newCurrentB = false;
+        }
+        if (newCurrentC)
+        {
+            Serial.print(",");
+            Serial.println(currentC);
+            newCurrentC = false;
+            Serial.print("\n");
+        }
+        #else
         if (newCurrentA)
         {
             Serial.print("\t");
@@ -81,6 +101,7 @@ void Trap::run()
             newCurrentC = false;
             Serial.print("\n");
         }
+        #endif
     #endif
     
 }

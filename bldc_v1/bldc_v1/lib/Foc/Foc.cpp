@@ -2,6 +2,14 @@
 
 
 Foc::Foc() {
+    /*Velocity*/
+    pid_vel.Kp = 1100.0; 
+    pid_vel.Ki = 110.0; 
+    pid_vel.Kd = 0.0;
+    
+    pid_vel.prevError = 0.0; 
+    pid_vel.integral = 0.0;
+
     /*Phases values*/
     phases.pwmA = 0;
     phases.pwmB = 0;
@@ -24,7 +32,7 @@ Foc::Foc() {
     pid_q.integral = 0.0;
 
     /*dt*/
-    lastRunTime = millis();
+    lastRunTime = micros();
 }
 
 Foc::~Foc() {}
@@ -142,28 +150,26 @@ void Foc::run() {
     }
     if (newCurrentC)
     {
-        unsigned long now = millis();
-        float dt = (now - lastRunTime) / 1000.0;
+        unsigned long now = micros();
+        float dt = (now - lastRunTime) / 1000000.0f;
         lastRunTime = now;
-        Serial.println(dt,7);
 
-        float rotorVelocity = measureVelocity(dt);
-
-        const double MAX_VELOCITY = 31.16;
-        double desiredVelocity = ((double)throttleNormVal / 4096.0) * MAX_VELOCITY;
+        // Velocity sht
+        const float MAX_VELOCITY = 25;
+        float desiredVelocity = ((float)throttleNormVal / 4096.0) * MAX_VELOCITY;
         
-        
+        // Update by irq
         int16_t curA = currentA;
         int16_t curB = currentB; 
         int16_t curC = currentC;
-        readCurrents(curA, curB, curC);
-        
+
         float a = (float)curA;
         float b = (float)curB;
         float c = (float)curC;
         
         /*Estimate theta*/
-        float theta = getRotorAngle();    
+        estimatePosition();
+        float theta = rotorPos;    
 
         ClarkeTransform_t ct = clarkeTransform(a, b, c);        
         ParkTransform_t pt = parkTransform(ct.alpha, ct.beta, theta);
@@ -171,7 +177,7 @@ void Foc::run() {
         double setpoint_d = 0.0;
         double setpoint_q = 0;
 
-        double iq_ref = computePID(pid_vel, desiredVelocity, rotorVelocity, dt);
+        double iq_ref = computePID(pid_vel, desiredVelocity, rpm, dt);
         
         double v_d = computePID(pid_d, setpoint_d, pt.d, dt);
         double v_q = computePID(pid_q, setpoint_q, pt.q, dt);
@@ -180,14 +186,14 @@ void Foc::run() {
         InverseClarke_t ic = inverseClarkeTransform(ip.iAlpha, ip.iBeta);
         
         // Map the commanded voltages to PWM duty cycles.
-        const float Vmax = 20.0;
+        const float Vmax = 24.0;
         int16_t dutyA = (int16_t)(constrain((ic.fdbackA + Vmax) / (2.0 * Vmax) * 4096.0, 0, 4096));
         int16_t dutyB = (int16_t)(constrain((ic.fdbackB + Vmax) / (2.0 * Vmax) * 4096.0, 0, 4096));
         int16_t dutyC = (int16_t)(constrain((ic.fdbackC + Vmax) / (2.0 * Vmax) * 4096.0, 0, 4096));
 
         phases.pwmA = dutyA;
-        phases.pwmA = dutyB;        
-        phases.pwmA = dutyC;        
+        phases.pwmB = dutyB;        
+        phases.pwmC = dutyC;        
 
         newCurrentC = false;
     }
